@@ -1,0 +1,3 @@
+# Este directorio almacena los archivos de migración generados por Alembic.
+# Se generan con: alembic revision --autogenerate -m "descripcion"
+# Se aplican con: alembic upgrade head

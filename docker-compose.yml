@@ -1,0 +1,30 @@
+# ============================================================
+# VegasDelRio - Docker Compose (Servicios Auxiliares)
+# ============================================================
+# Uso: docker-compose up -d
+# Este archivo gestiona los servicios de infraestructura local.
+# El backend y frontend se ejecutan directamente en la máquina.
+
+version: "3.9"
+
+services:
+  # -------------------------------------------
+  # Redis: Broker de mensajería para Celery
+  # -------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: vegasdelrio_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
