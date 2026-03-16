@@ -5,9 +5,39 @@ Tareas asíncronas para la generación masiva de PDFs y envío de correos.
 Estas tareas se ejecutan en segundo plano sin bloquear la API.
 """
 
+import logging
+import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session, joinedload
+
+from app.core import get_settings
+from app.models import (
+    Bill, BillItem, BillingPeriod, Property, PropertyOwner, Owner,
+    BillStatus, NotificationLog, NotificationChannel, NotificationStatus,
+)
+from app.services.pdf_service import generate_bill_pdf
+from app.services.email_service import send_bill_email
 from app.tasks.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
+
+# Engine síncrono singleton — reutilizado entre invocaciones de tareas.
+_sync_engine = None
+
+
+def _get_sync_engine():
+    global _sync_engine
+    if _sync_engine is None:
+        settings = get_settings()
+        _sync_engine = create_engine(
+            settings.database_url_direct,
+            pool_pre_ping=True,
+            pool_size=3,
+            max_overflow=5,
+        )
+    return _sync_engine
 
 
 @celery_app.task(bind=True, name="billing.generate_period_bills")
@@ -20,36 +50,12 @@ def generate_period_bills(
     Tarea: Genera facturas para todas las casas activas de un periodo.
 
     Flujo:
-    1. Consulta todas las casas activas con su propietario principal.
+    1. Consulta todas las casas activas con su propietario principal (una sola query).
     2. Crea un registro Bill + BillItems para cada casa.
-    3. Genera el PDF del recibo con WeasyPrint.
+    3. Genera el PDF del recibo.
     4. (Opcional) Envía el correo con el PDF adjunto.
-
-    Args:
-        billing_period_id: UUID del periodo como string.
-        send_notifications: Si debe enviar emails tras generar.
-
-    Returns:
-        dict con resumen de la operación.
     """
-    # Nota: Las tareas de Celery son síncronas, usamos conexión directa
-    # en lugar del engine async de FastAPI.
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
-
-    from app.core import get_settings
-    from app.models import (
-        Bill, BillItem, BillingPeriod, Property, PropertyOwner, Owner,
-        BillStatus, NotificationLog, NotificationChannel, NotificationStatus,
-    )
-    from app.services.pdf_service import generate_bill_pdf
-    from app.services.email_service import send_bill_email
-
-    settings = get_settings()
-
-    # Conexión síncrona directa (las tareas de Celery NO son async)
-    sync_url = settings.database_url_direct
-    engine = create_engine(sync_url, pool_pre_ping=True)
+    engine = _get_sync_engine()
 
     results = {
         "period_id": billing_period_id,
@@ -61,126 +67,138 @@ def generate_period_bills(
 
     with Session(engine) as db:
         # 1. Obtener el periodo
-        period = db.query(BillingPeriod).filter_by(id=billing_period_id).first()
+        period = db.execute(
+            select(BillingPeriod).where(BillingPeriod.id == billing_period_id)
+        ).scalar_one_or_none()
         if not period:
             results["errors"].append("Periodo no encontrado")
             return results
 
-        # 2. Obtener casas activas con propietario principal
-        active_assignments = (
-            db.query(PropertyOwner)
-            .join(Property, PropertyOwner.property_id == Property.id)
-            .join(Owner, PropertyOwner.owner_id == Owner.id)
-            .filter(
-                Property.is_active == True,
-                Owner.is_active == True,
-                PropertyOwner.is_primary == True,
-                PropertyOwner.end_date == None,  # Propietario actual
+        # 2. Obtener asignaciones activas con joinedload (elimina N+1)
+        stmt = (
+            select(PropertyOwner)
+            .join(Property, PropertyOwner.propiedad_id == Property.id)
+            .join(Owner, PropertyOwner.propietario_id == Owner.id)
+            .options(
+                joinedload(PropertyOwner.propiedad),
+                joinedload(PropertyOwner.propietario),
             )
-            .all()
+            .where(
+                Property.activo.is_(True),
+                Owner.activo.is_(True),
+                PropertyOwner.es_principal.is_(True),
+                PropertyOwner.fecha_fin.is_(None),
+            )
+        )
+        active_assignments = db.execute(stmt).unique().scalars().all()
+
+        # 3. Pre-cargar propiedades que ya tienen factura para este periodo
+        existing_property_ids = set(
+            db.execute(
+                select(Bill.propiedad_id).where(
+                    Bill.periodo_facturacion_id == period.id
+                )
+            ).scalars().all()
         )
 
         total = len(active_assignments)
+        bill_counter = len(existing_property_ids)
+
         for i, assignment in enumerate(active_assignments):
             try:
-                prop = db.query(Property).get(assignment.property_id)
-                owner = db.query(Owner).get(assignment.owner_id)
+                prop = assignment.propiedad
+                owner = assignment.propietario
 
-                # Verificar si ya existe factura para esta casa/periodo
-                existing = (
-                    db.query(Bill)
-                    .filter_by(
-                        property_id=prop.id,
-                        billing_period_id=period.id,
-                    )
-                    .first()
-                )
-                if existing:
+                # Omitir si ya tiene factura
+                if prop.id in existing_property_ids:
                     continue
 
-                # 3. Crear factura
-                bill_number = (
-                    f"VDR-{period.year}-{period.month:02d}-"
-                    f"{prop.house_number.zfill(3)}"
+                # 4. Crear factura
+                bill_counter += 1
+                numero_factura = (
+                    f"VDR-{period.anio}-{period.mes:02d}-"
+                    f"{prop.numero_casa.zfill(3)}"
                 )
+                bill_id = uuid.uuid4()
                 bill = Bill(
-                    bill_number=bill_number,
-                    property_id=prop.id,
-                    billing_period_id=period.id,
-                    owner_id=owner.id,
-                    total_amount=period.base_amount,
-                    status=BillStatus.DRAFT,
+                    id=bill_id,
+                    numero_factura=numero_factura,
+                    propiedad_id=prop.id,
+                    periodo_facturacion_id=period.id,
+                    propietario_id=owner.id,
+                    monto_total=float(period.monto_base),
+                    estado=BillStatus.DRAFT,
                 )
                 db.add(bill)
-                db.flush()   # Obtener ID sin commitear aún
 
-                # 4. Crear item de administración
+                # 5. Crear item de administración
                 item = BillItem(
-                    bill_id=bill.id,
-                    concept="Administración",
-                    description=f"Cuota de administración - {period.description}",
-                    amount=period.base_amount,
+                    factura_id=bill_id,
+                    concepto="Administración",
+                    descripcion=f"Cuota de administración - {period.descripcion}",
+                    monto=float(period.monto_base),
                 )
                 db.add(item)
                 results["bills_generated"] += 1
 
-                # 5. Generar PDF
+                # 6. Generar PDF
                 try:
+                    to_email = owner.correos[0] if owner.correos else None
                     bill_data = {
-                        "bill_number": bill_number,
+                        "bill_number": numero_factura,
                         "generated_date": datetime.now(timezone.utc).strftime(
                             "%d/%m/%Y"
                         ),
-                        "owner_name": owner.full_name,
-                        "owner_id_type": owner.id_type,
-                        "owner_id_number": owner.id_number,
-                        "owner_email": owner.email,
-                        "house_number": prop.house_number,
-                        "period": period.description,
-                        "due_date": period.due_date.strftime("%d/%m/%Y"),
+                        "owner_name": owner.nombre_completo,
+                        "owner_id_type": owner.tipo_documento,
+                        "owner_id_number": owner.numero_documento,
+                        "owner_email": to_email or "",
+                        "house_number": prop.numero_casa,
+                        "period": period.descripcion,
+                        "due_date": period.fecha_vencimiento.strftime("%d/%m/%Y"),
                         "items": [
                             {
                                 "concept": "Administración",
-                                "description": f"Cuota - {period.description}",
-                                "amount": float(period.base_amount),
+                                "description": f"Cuota - {period.descripcion}",
+                                "amount": float(period.monto_base),
                             }
                         ],
-                        "total_amount": float(period.base_amount),
+                        "total_amount": float(period.monto_base),
                     }
                     pdf_bytes = generate_bill_pdf(bill_data)
                     results["pdfs_created"] += 1
 
-                    # 6. Enviar email si se solicita
-                    if send_notifications and owner.email:
+                    # 7. Enviar email si se solicita
+                    if send_notifications and to_email:
                         success = send_bill_email(
-                            to_email=owner.email,
-                            owner_name=owner.full_name,
-                            period_description=period.description,
+                            to_email=to_email,
+                            owner_name=owner.nombre_completo,
+                            period_description=period.descripcion,
                             pdf_bytes=pdf_bytes,
                         )
 
-                        # Registrar notificación
                         log = NotificationLog(
-                            bill_id=bill.id,
-                            channel=NotificationChannel.EMAIL,
-                            recipient=owner.email,
-                            status=(
+                            factura_id=bill_id,
+                            canal=NotificationChannel.EMAIL,
+                            destinatario=to_email,
+                            estado=(
                                 NotificationStatus.SENT
                                 if success
                                 else NotificationStatus.FAILED
                             ),
-                            sent_at=datetime.now(timezone.utc) if success else None,
+                            enviado_en=datetime.now(timezone.utc) if success else None,
                         )
                         db.add(log)
 
                         if success:
-                            bill.status = BillStatus.PENDING
-                            bill.sent_at = datetime.now(timezone.utc)
+                            bill.estado = BillStatus.PENDING
+                            bill.enviado_en = datetime.now(timezone.utc)
                             results["emails_sent"] += 1
 
                 except Exception as pdf_err:
+                    logger.exception("Error PDF/Email Casa %s", prop.numero_casa)
                     results["errors"].append(
-                        f"Casa {prop.house_number}: Error PDF/Email - {str(pdf_err)}"
+                        f"Casa {prop.numero_casa}: Error PDF/Email - {str(pdf_err)}"
                     )
 
                 # Actualizar progreso de la tarea
@@ -190,8 +208,9 @@ def generate_period_bills(
                 )
 
             except Exception as e:
+                logger.exception("Error procesando asignación %s", assignment.propiedad_id)
                 results["errors"].append(
-                    f"Casa {assignment.property_id}: {str(e)}"
+                    f"Casa {assignment.propiedad_id}: {str(e)}"
                 )
 
         db.commit()

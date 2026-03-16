@@ -17,6 +17,10 @@ env/
 .Python
 pip-log.txt
 pip-delete-this-directory.txt
+# Archivo vacío creado por error en Windows
+nul
+# package-lock.json erróneo en el backend Python
+apps/backend/package-lock.json
 
 # ---- Node.js (Frontend) ----
 node_modules/
@@ -27,6 +31,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
 
 # ---- Variables de entorno ----
 .env
@@ -38,6 +45,7 @@ yarn-error.log*
 
 # ---- Archivos de ejemplo de env (SÍ se versionan) ----
 !.env.example
+!**/.env.example
 
 # ---- IDEs y Editores ----
 .vscode/settings.json
@@ -47,6 +55,7 @@ yarn-error.log*
 *~
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # ---- Testing ----
 htmlcov/
@@ -54,9 +63,16 @@ htmlcov/
 .coverage.*
 .pytest_cache/
 coverage/
+# Vitest / Jest
+/apps/frontend/coverage/
+
+# ---- Logs ----
+*.log
+logs/
 
 # ---- PDFs generados ----
 generated_pdfs/
+apps/backend/generated_pdfs/
 
 # ---- Celery ----
 celerybeat-schedule
@@ -64,3 +80,12 @@ celerybeat.pid
 
 # ---- Supabase ----
 supabase/.temp/
+
+# ---- Docker ----
+*.tar
+docker-compose.override.yml
+
+# ---- Archivos de sistema ----
+*.pem
+*.key
+*.crt

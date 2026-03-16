@@ -5,8 +5,6 @@
 # Este archivo gestiona los servicios de infraestructura local.
 # El backend y frontend se ejecutan directamente en la máquina.
 
-version: "3.9"
-
 services:
   # -------------------------------------------
   # Redis: Broker de mensajería para Celery

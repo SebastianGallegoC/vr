@@ -1,6 +1,7 @@
 /**
- * VegasDelRio - Middleware de Next.js.
+ * VegasDelRio - Proxy de Next.js 16+.
  *
+ * Reemplaza al antiguo middleware.ts.
  * Protege las rutas del dashboard y refresca la sesión de Supabase
  * en cada request para evitar que expire.
  */
@@ -8,7 +9,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -36,10 +37,14 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refrescar sesión (IMPORTANTE: no remover)
+  // Leer sesión desde la cookie (sin llamada de red → más rápido).
+  // Usamos getSession() aquí porque el proxy se ejecuta en CADA navegación.
+  // Para operaciones sensibles (server actions, API routes) usar getUser().
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const user = session?.user ?? null;
 
   // --- Protección de Rutas ---
 
@@ -68,7 +73,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Ejecutar middleware en todas las rutas excepto:
+     * Ejecutar proxy en todas las rutas excepto:
      * - _next/static (archivos estáticos)
      * - _next/image (optimización de imágenes)
      * - favicon.ico, archivos SVG/PNG/etc.

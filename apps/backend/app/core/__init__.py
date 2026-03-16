@@ -8,7 +8,10 @@ para ser usado de forma segura en toda la aplicación.
 from functools import lru_cache
 from typing import List
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_DEFAULT_KEY = "cambiar-por-una-clave-segura-de-32-caracteres"
 
 
 class Settings(BaseSettings):
@@ -25,17 +28,25 @@ class Settings(BaseSettings):
     app_name: str = "VegasDelRio"
     app_env: str = "development"
     debug: bool = True
-    secret_key: str = "cambiar-por-una-clave-segura-de-32-caracteres"
+    secret_key: str = _INSECURE_DEFAULT_KEY
     api_v1_prefix: str = "/api/v1"
 
     # ---- Base de Datos (Supabase) ----
     database_url: str = ""
     database_url_direct: str = ""
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
 
     # ---- Supabase Auth ----
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
+    supabase_jwt_secret: str = ""
+
+    # ---- Google OAuth (Gmail API) ----
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    frontend_url: str = "http://localhost:3500"
 
     # ---- Redis ----
     redis_url: str = "redis://localhost:6379/0"
@@ -55,7 +66,20 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
 
     # ---- CORS ----
-    cors_origins: List[str] = ["http://localhost:3000"]
+    cors_origins: List[str] = ["http://localhost:3500"]
+
+    @model_validator(mode="after")
+    def _validate_production_settings(self):
+        if self.app_env == "production":
+            if self.secret_key == _INSECURE_DEFAULT_KEY:
+                raise ValueError(
+                    "SECRET_KEY debe configurarse con un valor seguro en producción."
+                )
+            if not self.database_url:
+                raise ValueError(
+                    "DATABASE_URL es obligatorio en producción."
+                )
+        return self
 
     @property
     def is_development(self) -> bool:

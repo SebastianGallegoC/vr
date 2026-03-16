@@ -36,7 +36,11 @@ target_metadata = Base.metadata
 
 # Cargar URL de la BD desde .env (conexión directa para migraciones)
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url_direct)
+# Escapar '%' → '%%' porque ConfigParser interpreta '%' como interpolación
+config.set_main_option(
+    "sqlalchemy.url",
+    settings.database_url_direct.replace("%", "%%"),
+)
 
 
 def run_migrations_offline() -> None:

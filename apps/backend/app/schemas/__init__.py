@@ -12,6 +12,11 @@ from app.schemas.property import (
     PropertyResponse,
     PropertyUpdate,
 )
+from app.schemas.property_owner import (
+    AssignOwnerRequest,
+    CurrentOwnerInfo,
+    PropertyOwnerResponse,
+)
 from app.schemas.billing import (
     BillingPeriodCreate,
     BillingPeriodResponse,
@@ -30,6 +35,7 @@ from app.schemas.billing import (
 __all__ = [
     "OwnerCreate", "OwnerUpdate", "OwnerResponse", "OwnerListResponse",
     "PropertyCreate", "PropertyUpdate", "PropertyResponse", "PropertyListResponse",
+    "AssignOwnerRequest", "CurrentOwnerInfo", "PropertyOwnerResponse",
     "BillingPeriodCreate", "BillingPeriodUpdate", "BillingPeriodResponse",
     "BillCreate", "BillUpdate", "BillResponse", "BillListResponse",
     "BillItemCreate", "BillItemResponse",

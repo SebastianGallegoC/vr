@@ -18,12 +18,12 @@ from pydantic import BaseModel, EmailStr, Field
 
 class OwnerBase(BaseModel):
     """Campos comunes de un propietario."""
-    full_name: str = Field(..., min_length=2, max_length=200, examples=["Carlos Pérez"])
-    id_type: str = Field(default="CC", max_length=20, examples=["CC", "CE", "NIT"])
-    id_number: str = Field(..., min_length=3, max_length=30, examples=["1234567890"])
-    email: str = Field(..., max_length=254, examples=["carlos@email.com"])
-    phone: str | None = Field(default=None, max_length=20, examples=["+573001234567"])
-    notes: str | None = Field(default=None, examples=["Propietario desde 2020"])
+    nombre_completo: str = Field(..., min_length=2, max_length=200, examples=["Carlos Pérez"])
+    tipo_documento: str = Field(default="CC", max_length=20, examples=["CC", "CE", "NIT"])
+    numero_documento: str = Field(..., min_length=3, max_length=30, examples=["1234567890"])
+    correos: list[str] = Field(..., min_length=1, examples=[["carlos@email.com"]])
+    telefonos: list[str] = Field(default_factory=list, examples=[["+573001234567"]])
+    notas: str | None = Field(default=None, examples=["Propietario desde 2020"])
 
 
 # ============================================================
@@ -41,13 +41,19 @@ class OwnerCreate(OwnerBase):
 
 class OwnerUpdate(BaseModel):
     """Esquema para actualizar un propietario (todos los campos opcionales)."""
-    full_name: str | None = Field(default=None, min_length=2, max_length=200)
-    id_type: str | None = Field(default=None, max_length=20)
-    id_number: str | None = Field(default=None, min_length=3, max_length=30)
-    email: str | None = Field(default=None, max_length=254)
-    phone: str | None = Field(default=None, max_length=20)
-    notes: str | None = Field(default=None)
-    is_active: bool | None = Field(default=None)
+    nombre_completo: str | None = Field(default=None, min_length=2, max_length=200)
+    tipo_documento: str | None = Field(default=None, max_length=20)
+    numero_documento: str | None = Field(default=None, min_length=3, max_length=30)
+    correos: list[str] | None = Field(default=None, min_length=1)
+    telefonos: list[str] | None = Field(default=None)
+    notas: str | None = Field(default=None)
+    activo: bool | None = Field(default=None)
+
+
+class CurrentPropertyInfo(BaseModel):
+    """Casa actualmente asignada al propietario (si existe)."""
+    propiedad_id: uuid.UUID
+    numero_casa: str
 
 
 # ============================================================
@@ -57,9 +63,10 @@ class OwnerUpdate(BaseModel):
 class OwnerResponse(OwnerBase):
     """Esquema de respuesta al consultar un propietario."""
     id: uuid.UUID
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    activo: bool
+    creado_en: datetime
+    actualizado_en: datetime
+    casa_actual: CurrentPropertyInfo | None = None
 
     model_config = {"from_attributes": True}
 

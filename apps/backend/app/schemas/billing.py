@@ -15,11 +15,11 @@ from app.models.billing import BillStatus, NotificationChannel, NotificationStat
 # ============================================================
 
 class BillingPeriodBase(BaseModel):
-    month: int = Field(..., ge=1, le=12, examples=[2])
-    year: int = Field(..., ge=2020, le=2100, examples=[2026])
-    description: str = Field(..., max_length=100, examples=["Febrero 2026"])
-    base_amount: float = Field(..., gt=0, examples=[250000.00])
-    due_date: date = Field(..., examples=["2026-02-28"])
+    mes: int = Field(..., ge=1, le=12, examples=[2])
+    anio: int = Field(..., ge=2020, le=2100, examples=[2026])
+    descripcion: str = Field(..., max_length=100, examples=["Febrero 2026"])
+    monto_base: float = Field(..., gt=0, examples=[250000.00])
+    fecha_vencimiento: date = Field(..., examples=["2026-02-28"])
 
 
 class BillingPeriodCreate(BillingPeriodBase):
@@ -27,17 +27,17 @@ class BillingPeriodCreate(BillingPeriodBase):
 
 
 class BillingPeriodUpdate(BaseModel):
-    description: str | None = Field(default=None, max_length=100)
-    base_amount: float | None = Field(default=None, gt=0)
-    due_date: date | None = Field(default=None)
-    status: PeriodStatus | None = Field(default=None)
+    descripcion: str | None = Field(default=None, max_length=100)
+    monto_base: float | None = Field(default=None, gt=0)
+    fecha_vencimiento: date | None = Field(default=None)
+    estado: PeriodStatus | None = Field(default=None)
 
 
 class BillingPeriodResponse(BillingPeriodBase):
     id: uuid.UUID
-    status: PeriodStatus
-    created_at: datetime
-    updated_at: datetime
+    estado: PeriodStatus
+    creado_en: datetime
+    actualizado_en: datetime
 
     model_config = {"from_attributes": True}
 
@@ -47,9 +47,9 @@ class BillingPeriodResponse(BillingPeriodBase):
 # ============================================================
 
 class BillItemBase(BaseModel):
-    concept: str = Field(..., max_length=150, examples=["Administración"])
-    description: str | None = Field(default=None, examples=["Cuota mensual"])
-    amount: float = Field(..., examples=[250000.00])
+    concepto: str = Field(..., max_length=150, examples=["Administración"])
+    descripcion: str | None = Field(default=None, examples=["Cuota mensual"])
+    monto: float = Field(..., examples=[250000.00])
 
 
 class BillItemCreate(BillItemBase):
@@ -58,7 +58,7 @@ class BillItemCreate(BillItemBase):
 
 class BillItemResponse(BillItemBase):
     id: uuid.UUID
-    created_at: datetime
+    creado_en: datetime
 
     model_config = {"from_attributes": True}
 
@@ -68,10 +68,10 @@ class BillItemResponse(BillItemBase):
 # ============================================================
 
 class BillBase(BaseModel):
-    property_id: uuid.UUID
-    billing_period_id: uuid.UUID
-    owner_id: uuid.UUID
-    notes: str | None = Field(default=None)
+    propiedad_id: uuid.UUID
+    periodo_facturacion_id: uuid.UUID
+    propietario_id: uuid.UUID
+    notas: str | None = Field(default=None)
 
 
 class BillCreate(BillBase):
@@ -80,26 +80,31 @@ class BillCreate(BillBase):
 
 
 class BillUpdate(BaseModel):
-    status: BillStatus | None = Field(default=None)
-    notes: str | None = Field(default=None)
-    paid_at: datetime | None = Field(default=None)
+    estado: BillStatus | None = Field(default=None)
+    notas: str | None = Field(default=None)
+    pagado_en: datetime | None = Field(default=None)
 
 
 class BillResponse(BaseModel):
     id: uuid.UUID
-    bill_number: str
-    property_id: uuid.UUID
-    billing_period_id: uuid.UUID
-    owner_id: uuid.UUID
-    total_amount: float
-    status: BillStatus
-    pdf_url: str | None
-    notes: str | None
-    sent_at: datetime | None
-    paid_at: datetime | None
-    created_at: datetime
-    updated_at: datetime
+    numero_factura: str
+    propiedad_id: uuid.UUID
+    periodo_facturacion_id: uuid.UUID
+    propietario_id: uuid.UUID
+    monto_total: float
+    estado: BillStatus
+    url_pdf: str | None
+    notas: str | None
+    enviado_en: datetime | None
+    pagado_en: datetime | None
+    creado_en: datetime
+    actualizado_en: datetime
     items: list[BillItemResponse] = []
+
+    # Campos extra para evitar lookups adicionales en frontend
+    numero_casa: str | None = None
+    nombre_propietario: str | None = None
+    periodo_descripcion: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -117,13 +122,13 @@ class BillListResponse(BaseModel):
 
 class NotificationLogResponse(BaseModel):
     id: uuid.UUID
-    bill_id: uuid.UUID
-    channel: NotificationChannel
-    recipient: str
-    status: NotificationStatus
-    error_message: str | None
-    sent_at: datetime | None
-    created_at: datetime
+    factura_id: uuid.UUID
+    canal: NotificationChannel
+    destinatario: str
+    estado: NotificationStatus
+    mensaje_error: str | None
+    enviado_en: datetime | None
+    creado_en: datetime
 
     model_config = {"from_attributes": True}
 
@@ -134,15 +139,32 @@ class NotificationLogResponse(BaseModel):
 
 class GenerateBillsRequest(BaseModel):
     """Request para generar cobros masivos de un periodo."""
-    billing_period_id: uuid.UUID
-    send_notifications: bool = Field(
+    periodo_facturacion_id: uuid.UUID
+    enviar_notificaciones: bool = Field(
         default=False,
         description="Si se envían las notificaciones inmediatamente después de generar",
     )
 
 
 class GenerateBillsResponse(BaseModel):
-    """Respuesta tras disparar la generación masiva."""
-    task_id: str = Field(..., description="ID de la tarea de Celery para seguimiento")
-    message: str
-    bills_to_generate: int
+    """Respuesta tras generar cobros masivos."""
+    facturas_generadas: int
+    facturas_omitidas: int = 0
+    mensaje: str
+    errores: list[str] = []
+
+
+class SendEmailsResponse(BaseModel):
+    """Respuesta tras enviar correos de un periodo."""
+    total_facturas: int
+    emails_enviados: int
+    emails_fallidos: int
+    errores: list[str] = []
+
+
+class DashboardStatsResponse(BaseModel):
+    """Estadísticas resumidas para el dashboard."""
+    total_propiedades: int
+    total_propietarios_activos: int
+    facturas_mes: int
+    facturas_pendientes: int

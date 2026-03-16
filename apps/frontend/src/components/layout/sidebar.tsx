@@ -20,8 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
 
 const navItems = [
   {
@@ -53,14 +52,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const supabase = createClient();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  };
+  const { signOut } = useAuth();
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white">
@@ -75,8 +67,7 @@ export function Sidebar() {
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== "/dashboard" &&
-              pathname.startsWith(item.href));
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
           return (
             <Link
@@ -86,7 +77,7 @@ export function Sidebar() {
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -106,7 +97,7 @@ export function Sidebar() {
             "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
             pathname === "/dashboard/settings"
               ? "bg-blue-50 text-blue-700"
-              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
           )}
         >
           <Settings className="h-5 w-5" />
@@ -115,7 +106,7 @@ export function Sidebar() {
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 px-3 text-gray-600 hover:text-red-600"
-          onClick={handleLogout}
+          onClick={signOut}
         >
           <LogOut className="h-5 w-5" />
           Cerrar Sesión

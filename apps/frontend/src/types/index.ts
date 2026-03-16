@@ -11,34 +11,40 @@
 
 export interface Owner {
   id: string;
-  full_name: string;
-  id_type: string;
-  id_number: string;
-  email: string;
-  phone: string | null;
-  notes: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  nombre_completo: string;
+  tipo_documento: string;
+  numero_documento: string;
+  correos: string[];
+  telefonos: string[];
+  notas: string | null;
+  activo: boolean;
+  creado_en: string;
+  actualizado_en: string;
+  casa_actual: OwnerCurrentPropertyInfo | null;
+}
+
+export interface OwnerCurrentPropertyInfo {
+  propiedad_id: string;
+  numero_casa: string;
 }
 
 export interface OwnerCreate {
-  full_name: string;
-  id_type?: string;
-  id_number: string;
-  email: string;
-  phone?: string | null;
-  notes?: string | null;
+  nombre_completo: string;
+  tipo_documento?: string;
+  numero_documento: string;
+  correos: string[];
+  telefonos?: string[];
+  notas?: string | null;
 }
 
 export interface OwnerUpdate {
-  full_name?: string;
-  id_type?: string;
-  id_number?: string;
-  email?: string;
-  phone?: string | null;
-  notes?: string | null;
-  is_active?: boolean;
+  nombre_completo?: string;
+  tipo_documento?: string;
+  numero_documento?: string;
+  correos?: string[];
+  telefonos?: string[];
+  notas?: string | null;
+  activo?: boolean;
 }
 
 // ============================================================
@@ -47,31 +53,38 @@ export interface OwnerUpdate {
 
 export interface Property {
   id: string;
-  house_number: string;
-  address: string | null;
+  numero_casa: string;
+  direccion: string | null;
   area_m2: number | null;
-  aliquot: number | null;
-  notes: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  alicuota: number | null;
+  notas: string | null;
+  activo: boolean;
+  creado_en: string;
+  actualizado_en: string;
+  propietario_actual: CurrentOwnerInfo | null;
+}
+
+export interface CurrentOwnerInfo {
+  propietario_id: string;
+  nombre_completo: string;
+  numero_documento: string;
 }
 
 export interface PropertyCreate {
-  house_number: string;
-  address?: string | null;
+  numero_casa: string;
+  direccion?: string | null;
   area_m2?: number | null;
-  aliquot?: number | null;
-  notes?: string | null;
+  alicuota?: number | null;
+  notas?: string | null;
 }
 
 export interface PropertyUpdate {
-  house_number?: string;
-  address?: string | null;
+  numero_casa?: string;
+  direccion?: string | null;
   area_m2?: number | null;
-  aliquot?: number | null;
-  notes?: string | null;
-  is_active?: boolean;
+  alicuota?: number | null;
+  notas?: string | null;
+  activo?: boolean;
 }
 
 // ============================================================
@@ -82,22 +95,29 @@ export type PeriodStatus = "open" | "closed" | "cancelled";
 
 export interface BillingPeriod {
   id: string;
-  month: number;
-  year: number;
-  description: string;
-  base_amount: number;
-  due_date: string;
-  status: PeriodStatus;
-  created_at: string;
-  updated_at: string;
+  mes: number;
+  anio: number;
+  descripcion: string;
+  monto_base: number;
+  fecha_vencimiento: string;
+  estado: PeriodStatus;
+  creado_en: string;
+  actualizado_en: string;
 }
 
 export interface BillingPeriodCreate {
-  month: number;
-  year: number;
-  description: string;
-  base_amount: number;
-  due_date: string;
+  mes: number;
+  anio: number;
+  descripcion: string;
+  monto_base: number;
+  fecha_vencimiento: string;
+}
+
+export interface BillingPeriodUpdate {
+  descripcion?: string;
+  monto_base?: number;
+  fecha_vencimiento?: string;
+  estado?: PeriodStatus;
 }
 
 // ============================================================
@@ -113,27 +133,52 @@ export type BillStatus =
 
 export interface BillItem {
   id: string;
-  concept: string;
-  description: string | null;
-  amount: number;
-  created_at: string;
+  concepto: string;
+  descripcion: string | null;
+  monto: number;
+  creado_en: string;
 }
 
 export interface Bill {
   id: string;
-  bill_number: string;
-  property_id: string;
-  billing_period_id: string;
-  owner_id: string;
-  total_amount: number;
-  status: BillStatus;
-  pdf_url: string | null;
-  notes: string | null;
-  sent_at: string | null;
-  paid_at: string | null;
-  created_at: string;
-  updated_at: string;
+  numero_factura: string;
+  propiedad_id: string;
+  periodo_facturacion_id: string;
+  propietario_id: string;
+  monto_total: number;
+  estado: BillStatus;
+  url_pdf: string | null;
+  notas: string | null;
+  enviado_en: string | null;
+  pagado_en: string | null;
+  creado_en: string;
+  actualizado_en: string;
   items: BillItem[];
+
+  // Campos embebidos del backend para evitar lookups adicionales
+  numero_casa: string | null;
+  nombre_propietario: string | null;
+  periodo_descripcion: string | null;
+}
+
+export interface BillItemCreate {
+  concepto: string;
+  descripcion?: string | null;
+  monto: number;
+}
+
+export interface BillCreate {
+  propiedad_id: string;
+  periodo_facturacion_id: string;
+  propietario_id: string;
+  notas?: string | null;
+  items: BillItemCreate[];
+}
+
+export interface BillUpdate {
+  estado?: BillStatus;
+  notas?: string | null;
+  pagado_en?: string | null;
 }
 
 // ============================================================
@@ -145,13 +190,13 @@ export type NotificationStatus = "pending" | "sent" | "delivered" | "failed";
 
 export interface NotificationLog {
   id: string;
-  bill_id: string;
-  channel: NotificationChannel;
-  recipient: string;
-  status: NotificationStatus;
-  error_message: string | null;
-  sent_at: string | null;
-  created_at: string;
+  factura_id: string;
+  canal: NotificationChannel;
+  destinatario: string;
+  estado: NotificationStatus;
+  mensaje_error: string | null;
+  enviado_en: string | null;
+  creado_en: string;
 }
 
 // ============================================================
@@ -170,12 +215,20 @@ export interface PaginatedResponse<T> {
 // ============================================================
 
 export interface GenerateBillsRequest {
-  billing_period_id: string;
-  send_notifications?: boolean;
+  periodo_facturacion_id: string;
+  enviar_notificaciones?: boolean;
 }
 
 export interface GenerateBillsResponse {
-  task_id: string;
-  message: string;
-  bills_to_generate: number;
+  facturas_generadas: number;
+  facturas_omitidas: number;
+  mensaje: string;
+  errores: string[];
+}
+
+export interface SendEmailsResponse {
+  total_facturas: number;
+  emails_enviados: number;
+  emails_fallidos: number;
+  errores: string[];
 }

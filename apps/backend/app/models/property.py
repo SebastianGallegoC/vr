@@ -7,6 +7,11 @@ Es la entidad central a la que se asocian los cobros.
 
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.billing import Bill
+    from app.models.property_owner import PropertyOwner
 
 from sqlalchemy import Boolean, DateTime, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -16,9 +21,9 @@ from app.db.base import Base
 
 
 class Property(Base):
-    """Tabla: properties — Casas del conjunto residencial."""
+    """Tabla: propiedades — Casas del conjunto residencial."""
 
-    __tablename__ = "properties"
+    __tablename__ = "propiedades"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -28,14 +33,14 @@ class Property(Base):
     )
 
     # ---- Datos del Inmueble ----
-    house_number: Mapped[str] = mapped_column(
+    numero_casa: Mapped[str] = mapped_column(
         String(20),
         unique=True,
         nullable=False,
         index=True,
         comment="Número de la casa (ej: '1', '2A', '15')",
     )
-    address: Mapped[str | None] = mapped_column(
+    direccion: Mapped[str | None] = mapped_column(
         String(300),
         nullable=True,
         comment="Dirección completa del inmueble (opcional)",
@@ -45,32 +50,33 @@ class Property(Base):
         nullable=True,
         comment="Área del inmueble en metros cuadrados",
     )
-    aliquot: Mapped[float | None] = mapped_column(
+    alicuota: Mapped[float | None] = mapped_column(
         Numeric(6, 4),
         nullable=True,
         comment="Porcentaje de participación (alícuota) sobre áreas comunes",
     )
-    notes: Mapped[str | None] = mapped_column(
+    notas: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Notas internas sobre la propiedad",
     )
 
     # ---- Estado ----
-    is_active: Mapped[bool] = mapped_column(
+    activo: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
         nullable=False,
+        index=True,
         comment="Si el inmueble está activo en el sistema de cobros",
     )
 
     # ---- Auditoría ----
-    created_at: Mapped[datetime] = mapped_column(
+    creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    updated_at: Mapped[datetime] = mapped_column(
+    actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
@@ -78,15 +84,15 @@ class Property(Base):
     )
 
     # ---- Relaciones ----
-    property_ownerships: Mapped[list["PropertyOwner"]] = relationship(
+    propiedad_propietarios: Mapped[list["PropertyOwner"]] = relationship(
         "PropertyOwner",
-        back_populates="property",
+        back_populates="propiedad",
         cascade="all, delete-orphan",
     )
-    bills: Mapped[list["Bill"]] = relationship(
+    facturas: Mapped[list["Bill"]] = relationship(
         "Bill",
-        back_populates="property",
+        back_populates="propiedad",
     )
 
     def __repr__(self) -> str:
-        return f"<Property(id={self.id}, house='{self.house_number}')>"
+        return f"<Property(id={self.id}, casa='{self.numero_casa}')>"

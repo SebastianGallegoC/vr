@@ -36,6 +36,7 @@ celery_app.conf.update(
     # Reintentos
     task_acks_late=True,               # ACK después de procesar (no antes)
     task_reject_on_worker_lost=True,   # Re-encolar si el worker muere
+    broker_connection_retry_on_startup=True,  # Reintentar conexión al iniciar
 
     # Resultados
     result_expires=3600,               # Resultados expiran en 1 hora

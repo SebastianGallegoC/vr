@@ -4,15 +4,15 @@ Sistema integral para la gestión de cobros de administración del conjunto resi
 
 ## Stack Tecnológico
 
-| Capa | Tecnología |
-|------|-----------|
-| **Frontend** | Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui |
-| **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2.0 (async) |
-| **Base de Datos** | PostgreSQL (Supabase Cloud) |
-| **Autenticación** | Supabase Auth (JWT) |
-| **Cola de Tareas** | Celery + Redis |
-| **Generación PDF** | WeasyPrint + Jinja2 |
-| **Envío de Correo** | Resend / SMTP |
+| Capa                | Tecnología                                                    |
+| ------------------- | ------------------------------------------------------------- |
+| **Frontend**        | Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui |
+| **Backend**         | Python 3.11+, FastAPI, SQLAlchemy 2.0 (async)                 |
+| **Base de Datos**   | PostgreSQL (Supabase Cloud)                                   |
+| **Autenticación**   | Supabase Auth (JWT)                                           |
+| **Cola de Tareas**  | Celery + Redis                                                |
+| **Generación PDF**  | WeasyPrint + Jinja2                                           |
+| **Envío de Correo** | Resend / SMTP                                                 |
 
 ## Estructura del Proyecto
 

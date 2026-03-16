@@ -11,6 +11,11 @@ Define las tablas relacionadas con el proceso de facturación:
 import uuid
 from datetime import date, datetime, timezone
 from enum import Enum as PyEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.owner import Owner
+    from app.models.property import Property
 
 from sqlalchemy import (
     Date,
@@ -70,12 +75,12 @@ class NotificationStatus(str, PyEnum):
 # ============================================================
 
 class BillingPeriod(Base):
-    """Tabla: billing_periods — Periodo mensual de facturación."""
+    """Tabla: periodos_facturacion — Periodo mensual de facturación."""
 
-    __tablename__ = "billing_periods"
+    __tablename__ = "periodos_facturacion"
 
     __table_args__ = (
-        UniqueConstraint("month", "year", name="uq_period_month_year"),
+        UniqueConstraint("mes", "anio", name="uq_periodo_mes_anio"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -83,44 +88,44 @@ class BillingPeriod(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    month: Mapped[int] = mapped_column(
+    mes: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         comment="Mes del periodo (1-12)",
     )
-    year: Mapped[int] = mapped_column(
+    anio: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         comment="Año del periodo (ej: 2026)",
     )
-    description: Mapped[str] = mapped_column(
+    descripcion: Mapped[str] = mapped_column(
         String(100),
         nullable=False,
         comment="Descripción legible (ej: 'Febrero 2026')",
     )
-    base_amount: Mapped[float] = mapped_column(
+    monto_base: Mapped[float] = mapped_column(
         Numeric(12, 2),
         nullable=False,
         comment="Monto base de administración para este periodo",
     )
-    due_date: Mapped[date] = mapped_column(
+    fecha_vencimiento: Mapped[date] = mapped_column(
         Date,
         nullable=False,
         comment="Fecha límite de pago",
     )
-    status: Mapped[PeriodStatus] = mapped_column(
+    estado: Mapped[PeriodStatus] = mapped_column(
         Enum(PeriodStatus, name="period_status", create_constraint=True),
         default=PeriodStatus.OPEN,
         nullable=False,
     )
 
     # ---- Auditoría ----
-    created_at: Mapped[datetime] = mapped_column(
+    creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    updated_at: Mapped[datetime] = mapped_column(
+    actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
@@ -128,14 +133,14 @@ class BillingPeriod(Base):
     )
 
     # ---- Relaciones ----
-    bills: Mapped[list["Bill"]] = relationship(
+    facturas: Mapped[list["Bill"]] = relationship(
         "Bill",
-        back_populates="billing_period",
+        back_populates="periodo_facturacion",
         cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
-        return f"<BillingPeriod(id={self.id}, period='{self.description}')>"
+        return f"<BillingPeriod(id={self.id}, periodo='{self.descripcion}')>"
 
 
 # ============================================================
@@ -143,15 +148,15 @@ class BillingPeriod(Base):
 # ============================================================
 
 class Bill(Base):
-    """Tabla: bills — Factura/cobro individual para una casa específica."""
+    """Tabla: facturas — Factura/cobro individual para una casa específica."""
 
-    __tablename__ = "bills"
+    __tablename__ = "facturas"
 
     __table_args__ = (
         UniqueConstraint(
-            "property_id",
-            "billing_period_id",
-            name="uq_bill_property_period",
+            "propiedad_id",
+            "periodo_facturacion_id",
+            name="uq_factura_propiedad_periodo",
         ),
     )
 
@@ -160,7 +165,7 @@ class Bill(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
-    bill_number: Mapped[str] = mapped_column(
+    numero_factura: Mapped[str] = mapped_column(
         String(30),
         unique=True,
         nullable=False,
@@ -169,67 +174,69 @@ class Bill(Base):
     )
 
     # ---- Llaves Foráneas ----
-    property_id: Mapped[uuid.UUID] = mapped_column(
+    propiedad_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("properties.id", ondelete="RESTRICT"),
+        ForeignKey("propiedades.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
-    billing_period_id: Mapped[uuid.UUID] = mapped_column(
+    periodo_facturacion_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("billing_periods.id", ondelete="RESTRICT"),
+        ForeignKey("periodos_facturacion.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
     )
-    owner_id: Mapped[uuid.UUID] = mapped_column(
+    propietario_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("owners.id", ondelete="RESTRICT"),
+        ForeignKey("propietarios.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
         comment="Propietario al que se dirige este cobro",
     )
 
     # ---- Datos de la Factura ----
-    total_amount: Mapped[float] = mapped_column(
+    monto_total: Mapped[float] = mapped_column(
         Numeric(12, 2),
         nullable=False,
         comment="Monto total del cobro (suma de items)",
     )
-    status: Mapped[BillStatus] = mapped_column(
+    estado: Mapped[BillStatus] = mapped_column(
         Enum(BillStatus, name="bill_status", create_constraint=True),
         default=BillStatus.DRAFT,
         nullable=False,
+        index=True,
     )
-    pdf_url: Mapped[str | None] = mapped_column(
+    url_pdf: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
         comment="URL del PDF generado (Supabase Storage o local)",
     )
-    notes: Mapped[str | None] = mapped_column(
+    notas: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Notas internas sobre la factura",
     )
 
     # ---- Fechas de Seguimiento ----
-    sent_at: Mapped[datetime | None] = mapped_column(
+    enviado_en: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         comment="Fecha/hora en que se envió la notificación",
     )
-    paid_at: Mapped[datetime | None] = mapped_column(
+    pagado_en: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         comment="Fecha/hora en que se registró el pago",
     )
 
     # ---- Auditoría ----
-    created_at: Mapped[datetime] = mapped_column(
+    creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
+        index=True,
     )
-    updated_at: Mapped[datetime] = mapped_column(
+    actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
@@ -237,31 +244,31 @@ class Bill(Base):
     )
 
     # ---- Relaciones ----
-    property: Mapped["Property"] = relationship(
+    propiedad: Mapped["Property"] = relationship(
         "Property",
-        back_populates="bills",
+        back_populates="facturas",
     )
-    billing_period: Mapped["BillingPeriod"] = relationship(
+    periodo_facturacion: Mapped["BillingPeriod"] = relationship(
         "BillingPeriod",
-        back_populates="bills",
+        back_populates="facturas",
     )
-    owner: Mapped["Owner"] = relationship(
+    propietario: Mapped["Owner"] = relationship(
         "Owner",
-        back_populates="bills",
+        back_populates="facturas",
     )
     items: Mapped[list["BillItem"]] = relationship(
         "BillItem",
-        back_populates="bill",
+        back_populates="factura",
         cascade="all, delete-orphan",
     )
-    notifications: Mapped[list["NotificationLog"]] = relationship(
+    notificaciones: Mapped[list["NotificationLog"]] = relationship(
         "NotificationLog",
-        back_populates="bill",
+        back_populates="factura",
         cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
-        return f"<Bill(id={self.id}, number='{self.bill_number}', status='{self.status}')>"
+        return f"<Bill(id={self.id}, numero='{self.numero_factura}', estado='{self.estado}')>"
 
 
 # ============================================================
@@ -269,9 +276,9 @@ class Bill(Base):
 # ============================================================
 
 class BillItem(Base):
-    """Tabla: bill_items — Líneas de detalle de cada factura."""
+    """Tabla: items_factura — Líneas de detalle de cada factura."""
 
-    __tablename__ = "bill_items"
+    __tablename__ = "items_factura"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -280,45 +287,45 @@ class BillItem(Base):
     )
 
     # ---- Llave Foránea ----
-    bill_id: Mapped[uuid.UUID] = mapped_column(
+    factura_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("bills.id", ondelete="CASCADE"),
+        ForeignKey("facturas.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
     # ---- Datos del Concepto ----
-    concept: Mapped[str] = mapped_column(
+    concepto: Mapped[str] = mapped_column(
         String(150),
         nullable=False,
         comment="Nombre del concepto (ej: 'Administración', 'Cuota Extraordinaria')",
     )
-    description: Mapped[str | None] = mapped_column(
+    descripcion: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Descripción detallada del concepto",
     )
-    amount: Mapped[float] = mapped_column(
+    monto: Mapped[float] = mapped_column(
         Numeric(12, 2),
         nullable=False,
         comment="Monto de este concepto",
     )
 
     # ---- Auditoría ----
-    created_at: Mapped[datetime] = mapped_column(
+    creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
     # ---- Relaciones ----
-    bill: Mapped["Bill"] = relationship(
+    factura: Mapped["Bill"] = relationship(
         "Bill",
         back_populates="items",
     )
 
     def __repr__(self) -> str:
-        return f"<BillItem(concept='{self.concept}', amount={self.amount})>"
+        return f"<BillItem(concepto='{self.concepto}', monto={self.monto})>"
 
 
 # ============================================================
@@ -326,9 +333,9 @@ class BillItem(Base):
 # ============================================================
 
 class NotificationLog(Base):
-    """Tabla: notification_logs — Auditoría de notificaciones enviadas."""
+    """Tabla: registro_notificaciones — Auditoría de notificaciones enviadas."""
 
-    __tablename__ = "notification_logs"
+    __tablename__ = "registro_notificaciones"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -337,54 +344,54 @@ class NotificationLog(Base):
     )
 
     # ---- Llave Foránea ----
-    bill_id: Mapped[uuid.UUID] = mapped_column(
+    factura_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("bills.id", ondelete="CASCADE"),
+        ForeignKey("facturas.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
     # ---- Datos de la Notificación ----
-    channel: Mapped[NotificationChannel] = mapped_column(
+    canal: Mapped[NotificationChannel] = mapped_column(
         Enum(NotificationChannel, name="notification_channel", create_constraint=True),
         nullable=False,
         comment="Canal usado: email, whatsapp, telegram, sms",
     )
-    recipient: Mapped[str] = mapped_column(
+    destinatario: Mapped[str] = mapped_column(
         String(254),
         nullable=False,
         comment="Dirección del destinatario (email o teléfono)",
     )
-    status: Mapped[NotificationStatus] = mapped_column(
+    estado: Mapped[NotificationStatus] = mapped_column(
         Enum(NotificationStatus, name="notification_status", create_constraint=True),
         default=NotificationStatus.PENDING,
         nullable=False,
     )
-    error_message: Mapped[str | None] = mapped_column(
+    mensaje_error: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Mensaje de error si la entrega falló",
     )
 
     # ---- Fechas ----
-    sent_at: Mapped[datetime | None] = mapped_column(
+    enviado_en: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(
+    creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
     # ---- Relaciones ----
-    bill: Mapped["Bill"] = relationship(
+    factura: Mapped["Bill"] = relationship(
         "Bill",
-        back_populates="notifications",
+        back_populates="notificaciones",
     )
 
     def __repr__(self) -> str:
         return (
-            f"<NotificationLog(channel='{self.channel}', "
-            f"recipient='{self.recipient}', status='{self.status}')>"
+            f"<NotificationLog(canal='{self.canal}', "
+            f"destinatario='{self.destinatario}', estado='{self.estado}')>"
         )

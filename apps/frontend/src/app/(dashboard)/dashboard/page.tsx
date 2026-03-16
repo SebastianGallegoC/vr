@@ -1,10 +1,13 @@
 /**
  * VegasDelRio - Página principal del Dashboard.
  *
- * Muestra un resumen general con tarjetas de estadísticas.
+ * Muestra un resumen general con tarjetas de estadísticas reales.
  */
 
-import { Building2, Users, Receipt, AlertCircle } from "lucide-react";
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import { Building2, Users, Receipt, AlertCircle, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -12,35 +15,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { billsService } from "@/lib/services/bills";
 
-const stats = [
+const statsMeta = [
   {
+    key: "total_propiedades" as const,
     title: "Total Casas",
-    value: "—",
     description: "Casas registradas",
     icon: Building2,
     color: "text-blue-600",
     bg: "bg-blue-50",
   },
   {
+    key: "total_propietarios_activos" as const,
     title: "Propietarios",
-    value: "—",
     description: "Propietarios activos",
     icon: Users,
     color: "text-green-600",
     bg: "bg-green-50",
   },
   {
+    key: "facturas_mes" as const,
     title: "Cobros del Mes",
-    value: "—",
     description: "Facturas generadas",
     icon: Receipt,
     color: "text-purple-600",
     bg: "bg-purple-50",
   },
   {
+    key: "facturas_pendientes" as const,
     title: "Pendientes",
-    value: "—",
     description: "Cobros sin pagar",
     icon: AlertCircle,
     color: "text-orange-600",
@@ -49,6 +53,11 @@ const stats = [
 ];
 
 export default function DashboardPage() {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: billsService.getDashboardStats,
+  });
+
   return (
     <div className="space-y-6">
       {/* Bienvenida */}
@@ -63,7 +72,7 @@ export default function DashboardPage() {
 
       {/* Tarjetas de estadísticas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {statsMeta.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
@@ -74,7 +83,13 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{stat.value}</div>
+              <div className="text-3xl font-bold">
+                {isLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                ) : (
+                  (stats?.[stat.key] ?? "—")
+                )}
+              </div>
               <CardDescription>{stat.description}</CardDescription>
             </CardContent>
           </Card>
@@ -91,7 +106,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-500">
-            Conecta tu base de datos Supabase para ver datos reales.
+            Próximamente: historial de acciones recientes.
           </p>
         </CardContent>
       </Card>

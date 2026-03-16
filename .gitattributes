@@ -1,0 +1,12 @@
+# Normaliza todos los archivos de texto a LF en el repositorio
+* text=auto eol=lf
+
+# Fuerza LF explícitamente para scripts de shell
+*.sh text eol=lf
+
+# Archivos que deben quedar como binarios (sin conversión)
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.tar binary

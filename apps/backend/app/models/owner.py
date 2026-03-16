@@ -7,18 +7,23 @@ del conjunto residencial.
 
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.billing import Bill
+    from app.models.property_owner import PropertyOwner
 
 from sqlalchemy import Boolean, DateTime, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 class Owner(Base):
-    """Tabla: owners — Propietarios del conjunto residencial."""
+    """Tabla: propietarios — Propietarios del conjunto residencial."""
 
-    __tablename__ = "owners"
+    __tablename__ = "propietarios"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -28,7 +33,7 @@ class Owner(Base):
     )
 
     # Vinculación opcional con Supabase Auth (si el propietario se registra)
-    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(
+    id_usuario_auth: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         unique=True,
         nullable=True,
@@ -37,56 +42,58 @@ class Owner(Base):
     )
 
     # ---- Datos Personales ----
-    full_name: Mapped[str] = mapped_column(
+    nombre_completo: Mapped[str] = mapped_column(
         String(200),
         nullable=False,
         comment="Nombre completo del propietario",
     )
-    id_type: Mapped[str] = mapped_column(
+    tipo_documento: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         default="CC",
         comment="Tipo de documento: CC, CE, NIT, Pasaporte",
     )
-    id_number: Mapped[str] = mapped_column(
+    numero_documento: Mapped[str] = mapped_column(
         String(30),
         unique=True,
         nullable=False,
         index=True,
         comment="Número de documento de identidad",
     )
-    email: Mapped[str] = mapped_column(
-        String(254),
+    correos: Mapped[list[str]] = mapped_column(
+        ARRAY(String(254)),
         nullable=False,
-        index=True,
-        comment="Correo electrónico para notificaciones",
+        default=list,
+        comment="Lista de correos electrónicos para notificaciones",
     )
-    phone: Mapped[str | None] = mapped_column(
-        String(20),
-        nullable=True,
-        comment="Teléfono (con código de país, ej: +573001234567)",
+    telefonos: Mapped[list[str]] = mapped_column(
+        ARRAY(String(20)),
+        nullable=False,
+        default=list,
+        comment="Lista de teléfonos (con código de país, ej: +573001234567)",
     )
-    notes: Mapped[str | None] = mapped_column(
+    notas: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
         comment="Notas internas sobre el propietario",
     )
 
     # ---- Estado ----
-    is_active: Mapped[bool] = mapped_column(
+    activo: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
         nullable=False,
+        index=True,
         comment="Si el propietario está activo en el sistema",
     )
 
     # ---- Auditoría ----
-    created_at: Mapped[datetime] = mapped_column(
+    creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    updated_at: Mapped[datetime] = mapped_column(
+    actualizado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
@@ -94,15 +101,15 @@ class Owner(Base):
     )
 
     # ---- Relaciones ----
-    property_ownerships: Mapped[list["PropertyOwner"]] = relationship(
+    propiedad_propietarios: Mapped[list["PropertyOwner"]] = relationship(
         "PropertyOwner",
-        back_populates="owner",
+        back_populates="propietario",
         cascade="all, delete-orphan",
     )
-    bills: Mapped[list["Bill"]] = relationship(
+    facturas: Mapped[list["Bill"]] = relationship(
         "Bill",
-        back_populates="owner",
+        back_populates="propietario",
     )
 
     def __repr__(self) -> str:
-        return f"<Owner(id={self.id}, name='{self.full_name}', doc='{self.id_number}')>"
+        return f"<Owner(id={self.id}, nombre='{self.nombre_completo}', doc='{self.numero_documento}')>"

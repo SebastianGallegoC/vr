@@ -8,6 +8,7 @@ pueda detectarlos automáticamente al generar migraciones.
 from app.models.owner import Owner
 from app.models.property import Property
 from app.models.property_owner import PropertyOwner
+from app.models.email_config import EmailConfig
 from app.models.billing import (
     BillingPeriod,
     Bill,
@@ -25,6 +26,7 @@ __all__ = [
     "Owner",
     "Property",
     "PropertyOwner",
+    "EmailConfig",
     "BillingPeriod",
     "Bill",
     "BillItem",

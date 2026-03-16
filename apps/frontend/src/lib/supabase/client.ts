@@ -1,14 +1,19 @@
 /**
  * VegasDelRio - Cliente Supabase (Navegador).
  *
- * Crea un cliente de Supabase para usar en componentes del lado del cliente.
+ * Singleton: reutiliza la misma instancia en toda la app del lado del cliente.
  */
 
 import { createBrowserClient } from "@supabase/ssr";
 
+let client: ReturnType<typeof createBrowserClient> | null = null;
+
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  if (!client) {
+    client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return client;
 }

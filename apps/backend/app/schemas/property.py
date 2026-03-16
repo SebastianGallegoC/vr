@@ -4,8 +4,11 @@ VegasDelRio - Esquemas Pydantic: Property (Casa/Inmueble).
 
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
+
+from app.schemas.property_owner import CurrentOwnerInfo
 
 
 # ============================================================
@@ -14,11 +17,11 @@ from pydantic import BaseModel, Field
 
 class PropertyBase(BaseModel):
     """Campos comunes de una propiedad."""
-    house_number: str = Field(..., min_length=1, max_length=20, examples=["1", "2A", "15"])
-    address: str | None = Field(default=None, max_length=300, examples=["Manzana 3, Lote 5"])
+    numero_casa: str = Field(..., min_length=1, max_length=20, examples=["1", "2A", "15"])
+    direccion: str | None = Field(default=None, max_length=300, examples=["Manzana 3, Lote 5"])
     area_m2: float | None = Field(default=None, ge=0, examples=[120.50])
-    aliquot: float | None = Field(default=None, ge=0, le=100, examples=[2.5])
-    notes: str | None = Field(default=None)
+    alicuota: float | None = Field(default=None, ge=0, le=100, examples=[2.5])
+    notas: str | None = Field(default=None)
 
 
 # ============================================================
@@ -32,12 +35,12 @@ class PropertyCreate(PropertyBase):
 
 class PropertyUpdate(BaseModel):
     """Esquema para actualizar una propiedad (campos opcionales)."""
-    house_number: str | None = Field(default=None, min_length=1, max_length=20)
-    address: str | None = Field(default=None, max_length=300)
+    numero_casa: str | None = Field(default=None, min_length=1, max_length=20)
+    direccion: str | None = Field(default=None, max_length=300)
     area_m2: float | None = Field(default=None, ge=0)
-    aliquot: float | None = Field(default=None, ge=0, le=100)
-    notes: str | None = Field(default=None)
-    is_active: bool | None = Field(default=None)
+    alicuota: float | None = Field(default=None, ge=0, le=100)
+    notas: str | None = Field(default=None)
+    activo: bool | None = Field(default=None)
 
 
 # ============================================================
@@ -47,9 +50,10 @@ class PropertyUpdate(BaseModel):
 class PropertyResponse(PropertyBase):
     """Esquema de respuesta al consultar una propiedad."""
     id: uuid.UUID
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    activo: bool
+    creado_en: datetime
+    actualizado_en: datetime
+    propietario_actual: Optional[CurrentOwnerInfo] = None
 
     model_config = {"from_attributes": True}
 

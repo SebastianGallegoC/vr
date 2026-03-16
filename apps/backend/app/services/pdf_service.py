@@ -1,10 +1,11 @@
 """
 VegasDelRio - Servicio de Generación de PDFs.
 
-Usa WeasyPrint + Jinja2 para convertir plantillas HTML/CSS
+Usa xhtml2pdf + Jinja2 para convertir plantillas HTML/CSS
 en archivos PDF profesionales para los recibos de cobro.
 """
 
+import io
 import os
 from pathlib import Path
 
@@ -43,19 +44,15 @@ def generate_bill_pdf(bill_data: dict, output_path: str | None = None) -> bytes:
     template = jinja_env.get_template("bill_receipt.html")
     html_content = template.render(**bill_data)
 
-    # Importamos WeasyPrint aquí para evitar error si GTK no está instalado
-    # durante el import general del módulo
-    try:
-        from weasyprint import HTML
-    except OSError as e:
-        raise RuntimeError(
-            "WeasyPrint no puede cargar las librerías GTK/Pango. "
-            "Asegúrate de tener GTK3 Runtime instalado y en el PATH. "
-            f"Error original: {e}"
-        )
+    from xhtml2pdf import pisa  # type: ignore[import-untyped]
 
-    # Generar PDF en memoria
-    pdf_bytes = HTML(string=html_content).write_pdf()
+    buffer = io.BytesIO()
+    pisa_status = pisa.CreatePDF(html_content, dest=buffer, encoding="utf-8")
+
+    if pisa_status.err:
+        raise RuntimeError(f"Error generando PDF con xhtml2pdf: {pisa_status.err}")
+
+    pdf_bytes = buffer.getvalue()
 
     # Guardar en disco si se especifica ruta
     if output_path:
