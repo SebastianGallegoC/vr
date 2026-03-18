@@ -59,7 +59,19 @@ export default function LoginPage() {
     });
 
     if (authError) {
-      setError("Credenciales inválidas. Verifica tu email y contraseña.");
+      const message = authError.message.toLowerCase();
+
+      if (message.includes("invalid login credentials")) {
+        setError("Credenciales inválidas. Verifica tu email y contraseña.");
+      } else if (message.includes("email not confirmed")) {
+        setError(
+          "Tu correo no está confirmado. Revisa tu bandeja o solicita reenvío del enlace.",
+        );
+      } else {
+        setError(`No se pudo iniciar sesión: ${authError.message}`);
+      }
+
+      console.error("Supabase login error:", authError);
       setLoading(false);
       return;
     }

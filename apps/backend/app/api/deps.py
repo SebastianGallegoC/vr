@@ -113,7 +113,15 @@ async def get_current_user(
     )
 
     try:
-        jwk_dict = json.loads(jwt_secret)
+        jwt_secret_clean = jwt_secret.strip()
+        if (
+            len(jwt_secret_clean) >= 2
+            and jwt_secret_clean[0] == jwt_secret_clean[-1]
+            and jwt_secret_clean[0] in {"'", '"'}
+        ):
+            jwt_secret_clean = jwt_secret_clean[1:-1].strip()
+
+        jwk_dict = json.loads(jwt_secret_clean)
         payload = jwt.decode(
             token,
             jwk_dict,
