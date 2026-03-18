@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Bill } from "@/types";
+import { STATUS_CONFIG } from "@/components/bills/bill-table-row";
 import { formatCurrency } from "@/lib/utils";
 
 interface BillDetailProps {
@@ -30,33 +31,10 @@ interface BillDetailProps {
   bill: Bill | null;
 }
 
-const STATUS_LABELS: Record<string, { label: string; className: string }> = {
-  draft: {
-    label: "Borrador",
-    className: "bg-gray-100 text-gray-700",
-  },
-  pending: {
-    label: "Pendiente",
-    className: "bg-amber-100 text-amber-800",
-  },
-  paid: {
-    label: "Pagada",
-    className: "bg-emerald-100 text-emerald-800",
-  },
-  overdue: {
-    label: "Vencida",
-    className: "bg-red-100 text-red-700",
-  },
-  cancelled: {
-    label: "Cancelada",
-    className: "bg-slate-100 text-slate-600",
-  },
-};
-
 export function BillDetail({ open, onClose, bill }: BillDetailProps) {
   if (!bill) return null;
 
-  const status = STATUS_LABELS[bill.estado] ?? STATUS_LABELS.draft;
+  const status = STATUS_CONFIG[bill.estado] ?? STATUS_CONFIG.draft;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -77,7 +55,7 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
           {/* Info general */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-500">Casa</p>
+              <p className="text-muted-foreground">Casa</p>
               <p className="font-medium">
                 {bill.numero_casa
                   ? `Casa ${bill.numero_casa}`
@@ -85,19 +63,19 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
               </p>
             </div>
             <div>
-              <p className="text-gray-500">Propietario</p>
+              <p className="text-muted-foreground">Propietario</p>
               <p className="font-medium">
                 {bill.nombre_propietario ?? bill.propietario_id}
               </p>
             </div>
             <div>
-              <p className="text-gray-500">Periodo</p>
+              <p className="text-muted-foreground">Periodo</p>
               <p className="font-medium">
                 {bill.periodo_descripcion ?? bill.periodo_facturacion_id}
               </p>
             </div>
             <div>
-              <p className="text-gray-500">Total</p>
+              <p className="text-muted-foreground">Total</p>
               <p className="font-semibold text-lg">
                 {formatCurrency(bill.monto_total)}
               </p>
@@ -107,18 +85,18 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
           {/* Fechas */}
           <div className="grid grid-cols-3 gap-4 text-sm border-t pt-4">
             <div>
-              <p className="text-gray-500">Creado</p>
+              <p className="text-muted-foreground">Creado</p>
               <p>{new Date(bill.creado_en).toLocaleDateString("es-CO")}</p>
             </div>
             {bill.enviado_en && (
               <div>
-                <p className="text-gray-500">Enviado</p>
+                <p className="text-muted-foreground">Enviado</p>
                 <p>{new Date(bill.enviado_en).toLocaleDateString("es-CO")}</p>
               </div>
             )}
             {bill.pagado_en && (
               <div>
-                <p className="text-gray-500">Pagado</p>
+                <p className="text-muted-foreground">Pagado</p>
                 <p>{new Date(bill.pagado_en).toLocaleDateString("es-CO")}</p>
               </div>
             )}
@@ -127,8 +105,8 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
           {/* Notas */}
           {bill.notas && (
             <div className="text-sm border-t pt-4">
-              <p className="text-gray-500 mb-1">Notas</p>
-              <p className="text-gray-700">{bill.notas}</p>
+              <p className="text-muted-foreground mb-1">Notas</p>
+              <p className="text-foreground">{bill.notas}</p>
             </div>
           )}
 
@@ -138,7 +116,7 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
               <p className="text-sm font-semibold mb-2">Conceptos</p>
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50">
+                  <TableRow className="bg-muted">
                     <TableHead className="font-semibold">Concepto</TableHead>
                     <TableHead className="font-semibold">Descripción</TableHead>
                     <TableHead className="font-semibold text-right">
@@ -152,7 +130,7 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
                       <TableCell className="font-medium">
                         {item.concepto}
                       </TableCell>
-                      <TableCell className="text-gray-600">
+                      <TableCell className="text-muted-foreground">
                         {item.descripcion ?? "—"}
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -160,7 +138,7 @@ export function BillDetail({ open, onClose, bill }: BillDetailProps) {
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="bg-gray-50 font-semibold">
+                  <TableRow className="bg-muted font-semibold">
                     <TableCell colSpan={2} className="text-right">
                       Total
                     </TableCell>

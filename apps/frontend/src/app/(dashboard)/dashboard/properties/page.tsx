@@ -6,9 +6,14 @@
  * CRUD completo: listar, crear, editar y activar/desactivar propiedades.
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type {
+  ColumnDef,
+  SortingState,
+  RowSelectionState,
+} from "@tanstack/react-table";
 import {
   Building2,
   Plus,
@@ -16,13 +21,14 @@ import {
   Pencil,
   PowerOff,
   Power,
-  Loader2,
   UserPlus,
+  UserX,
   MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
@@ -30,14 +36,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,20 +47,36 @@ import { PropertyForm } from "@/components/properties/property-form";
 import { AssignOwnerDialog } from "@/components/properties/assign-owner-dialog";
 import { OwnerInfoDialog } from "@/components/properties/owner-info-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { DataTable } from "@/components/ui/data-table";
+import { SortableHeader } from "@/components/ui/sortable-header";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { propertiesService } from "@/lib/services/properties";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useDebounce } from "@/hooks/use-debounce";
 import { formatDate } from "@/lib/utils";
 import type { Property, PropertyCreate, PropertyUpdate } from "@/types";
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
 
 export default function PropertiesPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // ---- Estado UI ----
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [searchInput, setSearchInput] = useState("");
+  const search = useDebounce(searchInput);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   // Dialogs
   const [formOpen, setFormOpen] = useState(false);
@@ -79,19 +93,20 @@ export default function PropertiesPage() {
 
   // ---- Query: listar casas ----
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["properties", page, search],
+    queryKey: ["properties", page, pageSize, search],
     queryFn: () =>
       propertiesService.list({
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
         search: search || undefined,
       }),
     placeholderData: (prev) => prev,
+    enabled: !!user,
   });
 
   const properties = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const totalPages = Math.ceil(total / pageSize);
 
   // ---- Mutation: crear ----
   const createMutation = useMutation({
@@ -174,17 +189,200 @@ export default function PropertiesPage() {
     );
   }
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setSearch(searchInput);
+  function clearSearch() {
+    setSearchInput("");
     setPage(1);
   }
 
-  function clearSearch() {
-    setSearchInput("");
-    setSearch("");
-    setPage(1);
-  }
+  // ---- Column definitions ----
+  const columns = useMemo<ColumnDef<Property, unknown>[]>(
+    () => [
+      {
+        id: "select",
+        size: 40,
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Seleccionar todos"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Seleccionar fila"
+          />
+        ),
+        enableSorting: false,
+      },
+      {
+        accessorKey: "numero_casa",
+        header: ({ column }) => (
+          <SortableHeader column={column}>N° Casa</SortableHeader>
+        ),
+        size: 120,
+        cell: ({ row }) => (
+          <span className="font-bold text-lg text-primary">
+            {row.original.numero_casa}
+          </span>
+        ),
+      },
+      {
+        id: "propietario",
+        header: "Propietario",
+        cell: ({ row }) => {
+          const p = row.original;
+          return p.propietario_actual ? (
+            <button
+              type="button"
+              onClick={() => {
+                setOwnerInfoTarget({
+                  id: p.propietario_actual!.propietario_id,
+                  name: p.propietario_actual!.nombre_completo,
+                });
+                setOwnerInfoOpen(true);
+              }}
+              className="w-full max-w-[260px] rounded-lg border border-border bg-background px-3 py-2 text-left shadow-sm transition-all hover:bg-accent/40 hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            >
+              <p className="truncate text-sm font-semibold text-foreground">
+                {p.propietario_actual.nombre_completo}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {p.propietario_actual.numero_documento}
+              </p>
+            </button>
+          ) : (
+            <span className="text-xs text-amber-600 italic">
+              Sin propietario
+            </span>
+          );
+        },
+      },
+      {
+        id: "descripcion",
+        header: "Descripción",
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <p className="text-sm text-foreground font-medium">
+              {p.notas ? (
+                <span>{p.notas}</span>
+              ) : (
+                <span className="text-muted-foreground italic">Sin notas</span>
+              )}
+            </p>
+          );
+        },
+      },
+      {
+        accessorKey: "activo",
+        header: "Estado",
+        size: 100,
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <Badge
+              variant={p.activo ? "default" : "secondary"}
+              className={
+                p.activo
+                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                  : "bg-slate-100 text-slate-600"
+              }
+            >
+              {p.activo ? "✓ Activa" : "○ Inactiva"}
+            </Badge>
+          );
+        },
+      },
+      {
+        accessorKey: "creado_en",
+        header: ({ column }) => (
+          <SortableHeader column={column}>Creado</SortableHeader>
+        ),
+        size: 120,
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {formatDate(row.original.creado_en)}
+          </span>
+        ),
+      },
+      {
+        id: "acciones",
+        size: 50,
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <span className="sr-only">Acciones</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => openEdit(p)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openAssign(p)}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  {p.propietario_actual
+                    ? "Cambiar propietario"
+                    : "Asignar propietario"}
+                </DropdownMenuItem>
+                {p.propietario_actual && (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await propertiesService.removeOwner(p.id);
+                      queryClient.invalidateQueries({
+                        queryKey: ["properties"],
+                      });
+                      toast.success(
+                        `Propietario desvinculado de casa "${p.numero_casa}".`,
+                      );
+                    }}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <UserX className="mr-2 h-4 w-4" />
+                    Desvincular propietario
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => openConfirm(p)}
+                  className={
+                    p.activo
+                      ? "text-red-600 focus:text-red-600"
+                      : "text-green-700 focus:text-green-700"
+                  }
+                >
+                  {p.activo ? (
+                    <>
+                      <PowerOff className="mr-2 h-4 w-4" />
+                      Desactivar
+                    </>
+                  ) : (
+                    <>
+                      <Power className="mr-2 h-4 w-4" />
+                      Activar
+                    </>
+                  )}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // ---- Render ----
   return (
@@ -192,8 +390,21 @@ export default function PropertiesPage() {
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Casas</h2>
-          <p className="text-gray-500">
+          <Breadcrumb className="mb-2">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">
+                  Panel Principal
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Casas</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <h2 className="text-2xl font-bold text-foreground">Casas</h2>
+          <p className="text-muted-foreground">
             Administra las casas del conjunto residencial.
           </p>
         </div>
@@ -204,7 +415,7 @@ export default function PropertiesPage() {
       </div>
 
       {/* Tarjeta principal */}
-      <Card>
+      <Card className="shadow-md">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -220,20 +431,20 @@ export default function PropertiesPage() {
             </div>
 
             {/* Buscador */}
-            <form onSubmit={handleSearch} className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
+                  onChange={(e) => {
+                    setSearchInput(e.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Buscar por número..."
                   className="pl-8 w-52"
                 />
               </div>
-              <Button type="submit" variant="secondary" size="sm">
-                Buscar
-              </Button>
-              {search && (
+              {searchInput && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -243,167 +454,62 @@ export default function PropertiesPage() {
                   Limpiar
                 </Button>
               )}
-            </form>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Cargando casas...
-            </div>
-          ) : isError ? (
-            <div className="py-16 text-center text-red-500">
+          {isError ? (
+            <div className="py-16 text-center text-destructive">
               Error al cargar las casas. Verifica la conexión con el servidor.
-            </div>
-          ) : properties.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">
-              {search
-                ? `No se encontraron casas con "${search}".`
-                : "No hay casas registradas todavía. ¡Crea la primera!"}
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    <TableHead className="w-[120px] font-semibold">
-                      N° Casa
-                    </TableHead>
-                    <TableHead className="font-semibold">Propietario</TableHead>
-                    <TableHead className="font-semibold">Descripción</TableHead>
-                    <TableHead className="w-[100px] text-center font-semibold">
-                      Estado
-                    </TableHead>
-                    <TableHead className="w-[120px] text-right text-xs text-gray-500 font-medium">
-                      Creado
-                    </TableHead>
-                    <TableHead className="w-[50px]" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {properties.map((p) => (
-                    <TableRow
-                      key={p.id}
-                      className="hover:bg-blue-50/50 transition-colors"
-                    >
-                      <TableCell className="py-4 font-bold text-lg text-blue-600">
-                        {p.numero_casa}
-                      </TableCell>
-                      <TableCell className="py-4">
-                        {p.propietario_actual ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOwnerInfoTarget({
-                                id: p.propietario_actual!.propietario_id,
-                                name: p.propietario_actual!.nombre_completo,
-                              });
-                              setOwnerInfoOpen(true);
-                            }}
-                            className="w-full max-w-[260px] rounded-lg border border-border bg-background px-3 py-2 text-left shadow-sm transition-all hover:bg-accent/40 hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
-                          >
-                            <p className="truncate text-sm font-semibold text-foreground">
-                              {p.propietario_actual.nombre_completo}
-                            </p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {p.propietario_actual.numero_documento}
-                            </p>
-                          </button>
-                        ) : (
-                          <span className="text-xs text-amber-600 italic">
-                            Sin propietario
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <div className="space-y-1">
-                          <p className="text-sm text-gray-700 font-medium">
-                            {p.notas ? (
-                              <span>{p.notas}</span>
-                            ) : (
-                              <span className="text-gray-400 italic">
-                                Sin notas
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4 text-center">
-                        <Badge
-                          variant={p.activo ? "default" : "secondary"}
-                          className={
-                            p.activo
-                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-                              : "bg-slate-100 text-slate-600"
-                          }
-                        >
-                          {p.activo ? "✓ Activa" : "○ Inactiva"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-4 text-right text-xs text-gray-500">
-                        {formatDate(p.creado_en)}
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <span className="sr-only">Acciones</span>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(p)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openAssign(p)}>
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              {p.propietario_actual
-                                ? "Cambiar propietario"
-                                : "Asignar propietario"}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => openConfirm(p)}
-                              className={
-                                p.activo
-                                  ? "text-red-600 focus:text-red-600"
-                                  : "text-green-700 focus:text-green-700"
-                              }
-                            >
-                              {p.activo ? (
-                                <>
-                                  <PowerOff className="mr-2 h-4 w-4" />
-                                  Desactivar
-                                </>
-                              ) : (
-                                <>
-                                  <Power className="mr-2 h-4 w-4" />
-                                  Activar
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <TablePagination
-                page={page}
-                totalPages={totalPages}
-                total={total}
-                onPrev={() => setPage((p) => p - 1)}
-                onNext={() => setPage((p) => p + 1)}
+              <DataTable
+                columns={columns}
+                data={properties}
+                sorting={sorting}
+                onSortingChange={setSorting}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                isLoading={isLoading}
+                getRowId={(row) => row.id}
+                emptyState={
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Building2 className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">
+                      {search
+                        ? `No se encontraron casas con "${search}".`
+                        : "No hay casas registradas todavía."}
+                    </p>
+                    {!search && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={openCreate}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Agregar primera casa
+                      </Button>
+                    )}
+                  </div>
+                }
               />
+              {totalPages > 0 && (
+                <TablePagination
+                  page={page}
+                  totalPages={totalPages}
+                  total={total}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setPage(1);
+                  }}
+                  selectedCount={Object.keys(rowSelection).length}
+                />
+              )}
             </>
           )}
         </CardContent>

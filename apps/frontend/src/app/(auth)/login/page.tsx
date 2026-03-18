@@ -71,7 +71,7 @@ export default function LoginPage() {
   return (
     <Card className="shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold text-blue-600">
+        <CardTitle className="text-2xl font-bold text-primary">
           Vegas del Río
         </CardTitle>
         <CardDescription>

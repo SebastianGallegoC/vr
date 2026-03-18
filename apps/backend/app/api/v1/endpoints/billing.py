@@ -15,7 +15,7 @@ from cryptography.fernet import Fernet
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.core import get_settings
 from app.db import get_db
@@ -102,8 +102,7 @@ async def list_periods(
         query = query.where(BillingPeriod.anio == year)
 
     result = await db.execute(query)
-    periods = result.scalars().all()
-    return [BillingPeriodResponse.model_validate(p) for p in periods]
+    return result.scalars().all()
 
 
 @router.post(
@@ -173,9 +172,9 @@ async def list_bills(
     """Lista facturas con paginación y filtros."""
     query = select(Bill).options(
         selectinload(Bill.items),
-        selectinload(Bill.propietario),
-        selectinload(Bill.propiedad),
-        selectinload(Bill.periodo_facturacion),
+        joinedload(Bill.propietario),
+        joinedload(Bill.propiedad),
+        joinedload(Bill.periodo_facturacion),
     )
 
     if period_id:
@@ -217,9 +216,9 @@ async def get_bill(
         .options(
             selectinload(Bill.items),
             selectinload(Bill.notificaciones),
-            selectinload(Bill.propietario),
-            selectinload(Bill.propiedad),
-            selectinload(Bill.periodo_facturacion),
+            joinedload(Bill.propietario),
+            joinedload(Bill.propiedad),
+            joinedload(Bill.periodo_facturacion),
         )
         .where(Bill.id == bill_id)
     )
@@ -293,8 +292,8 @@ async def send_period_emails(
         select(Bill)
         .options(
             selectinload(Bill.items),
-            selectinload(Bill.propietario),
-            selectinload(Bill.propiedad),
+            joinedload(Bill.propietario),
+            joinedload(Bill.propiedad),
         )
         .where(Bill.periodo_facturacion_id == period_id)
     )
@@ -482,14 +481,6 @@ async def generate_bills(
         errores=[],
     )
 
-    # Contar último número de factura para el periodo (para secuencia)
-    last_bill_result = await db.execute(
-        select(func.count()).select_from(Bill).where(
-            Bill.periodo_facturacion_id == period.id
-        )
-    )
-    bill_counter = last_bill_result.scalar_one() or 0
-
     for prop in properties:
         # Omitir si ya tiene factura
         if prop.id in existing_property_ids:
@@ -505,11 +496,8 @@ async def generate_bills(
             )
             continue
 
-        # Generar número de factura
-        bill_counter += 1
-        numero_factura = (
-            f"VDR-{period.anio}-{period.mes:02d}-{bill_counter:03d}"
-        )
+        # Generar número de factura: {manzana}-{casa}-{mes}-{año}
+        numero_factura = f"{prop.numero_casa}-{period.mes}-{period.anio}"
 
         # Crear la factura (UUID generado en Python, sin flush necesario)
         bill_id = uuid.uuid4()

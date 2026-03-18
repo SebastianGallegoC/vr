@@ -52,12 +52,12 @@ export default function GmailCallbackPage() {
   }, [searchParams]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-muted">
       <div className="text-center space-y-3">
         {status === "loading" && (
           <>
-            <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
-            <p className="text-gray-600">Procesando autorización...</p>
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Procesando autorización...</p>
           </>
         )}
         {status === "success" && (
@@ -77,7 +77,7 @@ export default function GmailCallbackPage() {
                 />
               </svg>
             </div>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               ¡Gmail vinculado! Cerrando ventana...
             </p>
           </>
@@ -99,7 +99,7 @@ export default function GmailCallbackPage() {
                 />
               </svg>
             </div>
-            <p className="text-gray-600">
+            <p className="text-muted-foreground">
               Error en la autorización. Cerrando ventana...
             </p>
           </>

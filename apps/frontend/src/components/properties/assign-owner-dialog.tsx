@@ -180,7 +180,7 @@ export function AssignOwnerDialog({
         </div>
 
         {/* Lista de propietarios */}
-        <ScrollArea className="flex-1 min-h-0 max-h-[400px] border rounded-md">
+        <ScrollArea className="h-[300px] border rounded-md">
           {isLoading ? (
             <div className="flex items-center justify-center py-10 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

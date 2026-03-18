@@ -221,7 +221,7 @@ async def test_list_bills_after_generation(client: AsyncClient):
     bill = data["items"][0]
     assert bill["monto_total"] == 250000
     assert bill["estado"] == "draft"
-    assert bill["numero_factura"].startswith("VDR-")
+    assert bill["numero_factura"] == "C1-6-2025"
 
 
 async def test_list_bills_filter_by_period(client: AsyncClient):

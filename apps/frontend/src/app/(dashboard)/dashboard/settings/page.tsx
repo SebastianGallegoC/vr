@@ -22,6 +22,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -134,17 +142,28 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Configuración</h2>
-        <p className="text-gray-500">Ajustes generales del sistema.</p>
+        <Breadcrumb className="mb-2">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/dashboard">Panel Principal</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Configuración</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <h2 className="text-2xl font-bold text-foreground">Configuración</h2>
+        <p className="text-muted-foreground">Ajustes generales del sistema.</p>
       </div>
 
       {/* ---- Card: Email ---- */}
-      <Card>
+      <Card className="shadow-md">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                <Mail className="h-5 w-5 text-blue-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Mail className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <CardTitle>Servicio de Email</CardTitle>
@@ -163,24 +182,24 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Consultando estado...
             </div>
           ) : isLinked ? (
             /* --- Estado: Vinculado --- */
             <div className="space-y-4">
-              <div className="flex items-center gap-3 rounded-lg border bg-green-50 p-4">
+              <div className="flex items-center gap-3 rounded-lg border bg-accent p-4">
                 <GoogleIcon className="h-8 w-8 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-foreground">
                     Cuenta vinculada
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {emailStatus?.email_vinculado}
                   </p>
                   {emailStatus?.vinculado_en && (
-                    <p className="mt-1 text-xs text-gray-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Vinculado el{" "}
                       {new Date(emailStatus.vinculado_en).toLocaleDateString(
                         "es-CO",
@@ -195,7 +214,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Los recibos de administración se enviarán desde esta cuenta. Si
                 deseas cambiar la cuenta, desvincula primero.
               </p>
@@ -217,12 +236,12 @@ export default function SettingsPage() {
           ) : (
             /* --- Estado: Sin vincular --- */
             <div className="space-y-4">
-              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-                <Mail className="mx-auto h-10 w-10 text-gray-400" />
-                <p className="mt-2 text-sm font-medium text-gray-700">
+              <div className="rounded-lg border border-dashed border-border bg-muted p-6 text-center">
+                <Mail className="mx-auto h-10 w-10 text-muted-foreground" />
+                <p className="mt-2 text-sm font-medium text-foreground">
                   No hay cuenta de Gmail vinculada
                 </p>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Vincula tu cuenta de Google para enviar correos directamente
                   desde tu Gmail. No necesitas configurar contraseñas de
                   aplicación.
@@ -243,7 +262,7 @@ export default function SettingsPage() {
       </Card>
 
       {/* ---- Card: Información General ---- */}
-      <Card>
+      <Card className="shadow-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -254,15 +273,15 @@ export default function SettingsPage() {
         <CardContent>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Sistema</span>
+              <span className="text-muted-foreground">Sistema</span>
               <span className="font-medium">Vegas del Río</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Versión</span>
+              <span className="text-muted-foreground">Versión</span>
               <span className="font-medium">0.1.0</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Entorno</span>
+              <span className="text-muted-foreground">Entorno</span>
               <Badge variant="outline">Desarrollo</Badge>
             </div>
           </div>

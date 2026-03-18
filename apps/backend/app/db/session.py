@@ -16,10 +16,9 @@ settings = get_settings()
 # Engine asíncrono — Session mode (puerto 5432) soporta prepared statements
 engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
+    echo=False,
     pool_size=settings.db_pool_size,
     max_overflow=settings.db_max_overflow,
-    pool_pre_ping=True,
     pool_recycle=300,
 )
 

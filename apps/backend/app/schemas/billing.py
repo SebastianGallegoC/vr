@@ -20,6 +20,7 @@ class BillingPeriodBase(BaseModel):
     descripcion: str = Field(..., max_length=100, examples=["Febrero 2026"])
     monto_base: float = Field(..., gt=0, examples=[250000.00])
     fecha_vencimiento: date = Field(..., examples=["2026-02-28"])
+    recargo_mora: float = Field(0, ge=0, examples=[50000.00])
 
 
 class BillingPeriodCreate(BillingPeriodBase):
@@ -30,6 +31,7 @@ class BillingPeriodUpdate(BaseModel):
     descripcion: str | None = Field(default=None, max_length=100)
     monto_base: float | None = Field(default=None, gt=0)
     fecha_vencimiento: date | None = Field(default=None)
+    recargo_mora: float | None = Field(default=None, ge=0)
     estado: PeriodStatus | None = Field(default=None)
 
 

@@ -6,17 +6,18 @@
  * CRUD completo: listar (con filtro por año), crear y editar periodos.
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 import {
   CalendarDays,
   Plus,
   Pencil,
-  Loader2,
   Filter,
   Mail,
   FileText,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,14 +28,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -50,8 +43,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { PeriodForm } from "@/components/periods/period-form";
+import { DataTable } from "@/components/ui/data-table";
+import { SortableHeader } from "@/components/ui/sortable-header";
 import { periodsService } from "@/lib/services/periods";
+import { useAuth } from "@/components/providers/auth-provider";
 import { formatCurrency } from "@/lib/utils";
 import type {
   BillingPeriod,
@@ -96,9 +100,11 @@ const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => currentYear - 2 + i);
 
 export default function PeriodsPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // ---- Estado UI ----
   const [yearFilter, setYearFilter] = useState<number | undefined>(undefined);
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   // Dialogs
   const [formOpen, setFormOpen] = useState(false);
@@ -123,6 +129,7 @@ export default function PeriodsPage() {
     queryKey: ["periods", yearFilter],
     queryFn: () => periodsService.list({ year: yearFilter }),
     placeholderData: (prev) => prev,
+    enabled: !!user,
   });
 
   // ---- Mutation: crear ----
@@ -250,16 +257,158 @@ export default function PeriodsPage() {
     }
   }
 
+  // ---- Column definitions ----
+  const columns = useMemo<ColumnDef<BillingPeriod, unknown>[]>(
+    () => [
+      {
+        id: "periodo",
+        header: ({ column }) => (
+          <SortableHeader column={column}>Periodo</SortableHeader>
+        ),
+        accessorFn: (row) => `${row.anio}-${String(row.mes).padStart(2, "0")}`,
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <p className="font-semibold text-foreground">
+              {MESES[p.mes]} {p.anio}
+            </p>
+          );
+        },
+      },
+      {
+        accessorKey: "descripcion",
+        header: "Descripción",
+        cell: ({ row }) => (
+          <span className="text-foreground">{row.original.descripcion}</span>
+        ),
+      },
+      {
+        accessorKey: "monto_base",
+        header: ({ column }) => (
+          <SortableHeader column={column}>Monto Base</SortableHeader>
+        ),
+        cell: ({ row }) => (
+          <span className="font-medium text-right block">
+            {formatCurrency(row.original.monto_base)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "recargo_mora",
+        header: "Recargo Mora",
+        cell: ({ row }) => (
+          <span className="font-medium text-orange-600 text-right block">
+            {formatCurrency(row.original.recargo_mora)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "fecha_vencimiento",
+        header: "Vencimiento",
+        cell: ({ row }) => (
+          <span className="text-foreground">
+            {new Date(
+              row.original.fecha_vencimiento + "T00:00:00",
+            ).toLocaleDateString("es-CO")}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "estado",
+        header: "Estado",
+        size: 110,
+        cell: ({ row }) => {
+          const status =
+            STATUS_CONFIG[row.original.estado] ?? STATUS_CONFIG.open;
+          return (
+            <Badge variant="secondary" className={status.className}>
+              {status.label}
+            </Badge>
+          );
+        },
+      },
+      {
+        accessorKey: "creado_en",
+        header: ({ column }) => (
+          <SortableHeader column={column}>Creado</SortableHeader>
+        ),
+        size: 120,
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {new Date(row.original.creado_en).toLocaleDateString("es-CO")}
+          </span>
+        ),
+      },
+      {
+        id: "acciones",
+        size: 50,
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <span className="sr-only">Acciones</span>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => openEdit(p)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+                {p.estado === "open" && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => openGenerate(p)}
+                      className="text-emerald-600 focus:text-emerald-600"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Generar cobros
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => openSendEmail(p)}
+                      className="text-blue-600 focus:text-blue-600"
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      Enviar facturas por email
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   // ---- Render ----
   return (
     <div className="space-y-6">
       {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <Breadcrumb className="mb-2">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/dashboard">
+                  Panel Principal
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Periodos de Facturación</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <h2 className="text-2xl font-bold text-foreground">
             Periodos de Facturación
           </h2>
-          <p className="text-gray-500">
+          <p className="text-muted-foreground">
             Gestiona los periodos mensuales de cobro.
           </p>
         </div>
@@ -270,7 +419,7 @@ export default function PeriodsPage() {
       </div>
 
       {/* Tarjeta principal */}
-      <Card>
+      <Card className="shadow-md">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -287,7 +436,7 @@ export default function PeriodsPage() {
 
             {/* Filtro por año */}
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-400" />
+              <Filter className="h-4 w-4 text-muted-foreground" />
               <Select
                 value={yearFilter ? String(yearFilter) : "all"}
                 onValueChange={(val) =>
@@ -311,127 +460,41 @@ export default function PeriodsPage() {
         </CardHeader>
 
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Cargando periodos...
-            </div>
-          ) : isError ? (
-            <div className="py-16 text-center text-red-500">
+          {isError ? (
+            <div className="py-16 text-center text-destructive">
               Error al cargar los periodos. Verifica la conexión con el
               servidor.
             </div>
-          ) : periods.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">
-              {yearFilter
-                ? `No hay periodos registrados para el año ${yearFilter}.`
-                : "No hay periodos registrados todavía. ¡Crea el primero!"}
-            </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 hover:bg-gray-50">
-                  <TableHead className="font-semibold">Periodo</TableHead>
-                  <TableHead className="font-semibold">Descripción</TableHead>
-                  <TableHead className="font-semibold text-right">
-                    Monto Base
-                  </TableHead>
-                  <TableHead className="font-semibold">Vencimiento</TableHead>
-                  <TableHead className="w-[110px] text-center font-semibold">
-                    Estado
-                  </TableHead>
-                  <TableHead className="w-[120px] text-right text-xs text-gray-500 font-medium">
-                    Creado
-                  </TableHead>
-                  <TableHead className="w-[50px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {periods.map((p) => {
-                  const status = STATUS_CONFIG[p.estado] ?? STATUS_CONFIG.open;
-                  return (
-                    <TableRow
-                      key={p.id}
-                      className="hover:bg-blue-50/50 transition-colors"
+            <DataTable
+              columns={columns}
+              data={periods}
+              sorting={sorting}
+              onSortingChange={setSorting}
+              isLoading={isLoading}
+              getRowId={(row) => row.id}
+              emptyState={
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <CalendarDays className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                  <p className="text-muted-foreground">
+                    {yearFilter
+                      ? `No hay periodos registrados para el año ${yearFilter}.`
+                      : "No hay periodos registrados todavía."}
+                  </p>
+                  {!yearFilter && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={openCreate}
                     >
-                      <TableCell className="py-4">
-                        <p className="font-semibold text-gray-900">
-                          {MESES[p.mes]} {p.anio}
-                        </p>
-                      </TableCell>
-                      <TableCell className="py-4 text-gray-700">
-                        {p.descripcion}
-                      </TableCell>
-                      <TableCell className="py-4 text-right font-medium">
-                        {formatCurrency(p.monto_base)}
-                      </TableCell>
-                      <TableCell className="py-4 text-gray-700">
-                        {new Date(
-                          p.fecha_vencimiento + "T00:00:00",
-                        ).toLocaleDateString("es-CO")}
-                      </TableCell>
-                      <TableCell className="py-4 text-center">
-                        <Badge variant="secondary" className={status.className}>
-                          {status.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-4 text-right text-xs text-gray-500">
-                        {new Date(p.creado_en).toLocaleDateString("es-CO")}
-                      </TableCell>
-                      <TableCell className="py-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <span className="sr-only">Acciones</span>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="currentColor"
-                              >
-                                <circle cx="12" cy="5" r="1.5" />
-                                <circle cx="12" cy="12" r="1.5" />
-                                <circle cx="12" cy="19" r="1.5" />
-                              </svg>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(p)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            {p.estado === "open" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={() => openGenerate(p)}
-                                  className="text-emerald-600 focus:text-emerald-600"
-                                >
-                                  <FileText className="mr-2 h-4 w-4" />
-                                  Generar cobros
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => openSendEmail(p)}
-                                  className="text-blue-600 focus:text-blue-600"
-                                >
-                                  <Mail className="mr-2 h-4 w-4" />
-                                  Enviar facturas por email
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Crear primer periodo
+                    </Button>
+                  )}
+                </div>
+              }
+            />
           )}
         </CardContent>
       </Card>

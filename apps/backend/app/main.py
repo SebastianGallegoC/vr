@@ -2,6 +2,7 @@
 VegasDelRio - Punto de Entrada de la Aplicación FastAPI.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -11,8 +12,8 @@ from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
 
 from app.core import get_settings
-from app.api.v1.router import api_v1_router
-from app.db.session import AsyncSessionLocal
+from app.api.v1.router import api_v1_router, portal_router
+from app.db.session import AsyncSessionLocal, engine
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -21,6 +22,15 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ciclo de vida de la aplicación: startup y shutdown."""
+    # Warm-up: pre-crea pool_size conexiones en paralelo para que
+    # las primeras requests no paguen el costo de establecerlas.
+    async def _ping():
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+
+    await asyncio.gather(*[_ping() for _ in range(settings.db_pool_size)])
+    logger.info("Database pool warmed up (%d connections)", settings.db_pool_size)
+
     logger.info("%s API iniciada [%s]", settings.app_name, settings.app_env)
     logger.info("CORS Origins: %s", settings.cors_origins)
     yield
@@ -51,6 +61,9 @@ app.add_middleware(
 
 # ---- Rutas de la API v1 ----
 app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
+
+# ---- Portal de propietarios (auth propia, mismo prefijo) ----
+app.include_router(portal_router, prefix=settings.api_v1_prefix)
 
 
 # ---- Health Check ----

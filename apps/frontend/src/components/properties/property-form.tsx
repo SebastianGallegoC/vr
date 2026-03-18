@@ -1,12 +1,9 @@
 "use client";
 
-/**
- * VegasDelRio - Formulario de Casa (Crear / Editar).
- *
- * Dialog reutilizable para crear o editar una propiedad.
- */
-
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,25 +15,39 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import type { Property, PropertyCreate, PropertyUpdate } from "@/types";
 
 interface PropertyFormProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: PropertyCreate | PropertyUpdate) => Promise<void>;
-  property?: Property | null; // null = modo crear, Property = modo editar
+  property?: Property | null;
 }
 
-interface FormState {
-  numero_casa: string;
-  notas: string;
-}
+const DIGITS_ONLY = /^\d*$/;
 
-const EMPTY_FORM: FormState = {
-  numero_casa: "",
-  notas: "",
-};
+const propertySchema = z.object({
+  manzana: z
+    .string()
+    .min(1, "La manzana es obligatoria.")
+    .regex(/^\d+$/, "Solo se permiten dígitos."),
+  numero_casa: z
+    .string()
+    .min(1, "El número de casa es obligatorio.")
+    .regex(/^\d+$/, "Solo se permiten dígitos."),
+  notas: z.string(),
+});
+
+type PropertyFormValues = z.infer<typeof propertySchema>;
 
 export function PropertyForm({
   open,
@@ -45,46 +56,30 @@ export function PropertyForm({
   property,
 }: PropertyFormProps) {
   const isEditing = Boolean(property);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Partial<FormState>>({});
 
-  // Poblar el formulario al abrir en modo edición
+  const form = useForm<PropertyFormValues>({
+    resolver: zodResolver(propertySchema),
+    defaultValues: { manzana: "", numero_casa: "", notas: "" },
+  });
+
   useEffect(() => {
     if (property) {
-      setForm({
-        numero_casa: property.numero_casa ?? "",
-        notas: property.notas ?? "",
-      });
+      const [manzana = "", numero = ""] = (property.numero_casa ?? "").split(
+        "-",
+      );
+      form.reset({ manzana, numero_casa: numero, notas: property.notas ?? "" });
     } else {
-      setForm(EMPTY_FORM);
+      form.reset({ manzana: "", numero_casa: "", notas: "" });
     }
-    setErrors({});
-  }, [property, open]);
+  }, [property, open, form]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-    setErrors((prev) => ({ ...prev, [e.target.name]: undefined }));
-  }
-
-  function validate(): boolean {
-    const newErrors: Partial<FormState> = {};
-    if (!form.numero_casa.trim()) {
-      newErrors.numero_casa = "El número de casa es obligatorio.";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
-
+  async function handleValid(data: PropertyFormValues) {
     setLoading(true);
     try {
       const payload: PropertyCreate | PropertyUpdate = {
-        numero_casa: form.numero_casa.trim(),
-        notas: form.notas.trim() || null,
+        numero_casa: `${data.manzana.trim()}-${data.numero_casa.trim()}`,
+        notas: data.notas.trim() || null,
       };
       await onSubmit(payload);
       onClose();
@@ -105,52 +100,99 @@ export function PropertyForm({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          {/* Número de casa */}
-          <div className="space-y-1">
-            <Label htmlFor="numero_casa">
-              Número de casa <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="numero_casa"
-              name="numero_casa"
-              value={form.numero_casa}
-              onChange={handleChange}
-              placeholder="Ej: 1, 2A, Casa 15"
-              autoFocus
-            />
-            {errors.numero_casa && (
-              <p className="text-xs text-red-500">{errors.numero_casa}</p>
-            )}
-          </div>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(handleValid)}
+            className="space-y-4 py-2"
+          >
+            {/* Manzana y Número de casa */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="manzana"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Manzana <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ej: 6"
+                        inputMode="numeric"
+                        autoFocus
+                        {...field}
+                        onChange={(e) => {
+                          if (DIGITS_ONLY.test(e.target.value)) {
+                            field.onChange(e);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          {/* Notas */}
-          <div className="space-y-1">
-            <Label htmlFor="notas">Notas</Label>
-            <Input
-              id="notas"
+              <FormField
+                control={form.control}
+                name="numero_casa"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      N° Casa <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ej: 21"
+                        inputMode="numeric"
+                        {...field}
+                        onChange={(e) => {
+                          if (DIGITS_ONLY.test(e.target.value)) {
+                            field.onChange(e);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Notas */}
+            <FormField
+              control={form.control}
               name="notas"
-              value={form.notas}
-              onChange={handleChange}
-              placeholder="Observaciones adicionales"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notas</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Observaciones adicionales"
+                      rows={3}
+                      {...field}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
             />
-          </div>
 
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Guardar cambios" : "Crear casa"}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditing ? "Guardar cambios" : "Crear casa"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

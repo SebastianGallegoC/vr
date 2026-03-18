@@ -102,7 +102,6 @@ def generate_period_bills(
         )
 
         total = len(active_assignments)
-        bill_counter = len(existing_property_ids)
 
         for i, assignment in enumerate(active_assignments):
             try:
@@ -114,11 +113,7 @@ def generate_period_bills(
                     continue
 
                 # 4. Crear factura
-                bill_counter += 1
-                numero_factura = (
-                    f"VDR-{period.anio}-{period.mes:02d}-"
-                    f"{prop.numero_casa.zfill(3)}"
-                )
+                numero_factura = f"{prop.numero_casa}-{period.mes}-{period.anio}"
                 bill_id = uuid.uuid4()
                 bill = Bill(
                     id=bill_id,

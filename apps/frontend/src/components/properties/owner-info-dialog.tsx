@@ -55,7 +55,7 @@ export function OwnerInfoDialog({
           <div className="space-y-4">
             {/* Documento */}
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
                 <FileText className="h-4 w-4" />
               </div>
               <div>
@@ -82,7 +82,7 @@ export function OwnerInfoDialog({
                     <a
                       key={i}
                       href={`mailto:${correo}`}
-                      className="text-sm text-blue-600 hover:underline break-all"
+                      className="text-sm text-primary hover:underline break-all"
                     >
                       {correo}
                     </a>
@@ -111,7 +111,7 @@ export function OwnerInfoDialog({
                     <a
                       key={i}
                       href={`tel:${tel}`}
-                      className="text-sm text-blue-600 hover:underline"
+                      className="text-sm text-primary hover:underline"
                     >
                       {tel}
                     </a>
@@ -132,7 +132,7 @@ export function OwnerInfoDialog({
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                     Notas
                   </p>
-                  <p className="text-sm text-gray-700">{owner.notas}</p>
+                  <p className="text-sm text-foreground">{owner.notas}</p>
                 </div>
               </>
             )}

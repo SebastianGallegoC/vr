@@ -113,6 +113,13 @@ class BillingPeriod(Base):
         nullable=False,
         comment="Fecha límite de pago",
     )
+    recargo_mora: Mapped[float] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=0,
+        server_default="0",
+        comment="Recargo por mora cuando se supera la fecha de vencimiento",
+    )
     estado: Mapped[PeriodStatus] = mapped_column(
         Enum(PeriodStatus, name="period_status", create_constraint=True),
         default=PeriodStatus.OPEN,
@@ -170,7 +177,7 @@ class Bill(Base):
         unique=True,
         nullable=False,
         index=True,
-        comment="Número consecutivo de factura (ej: VDR-2026-02-001)",
+        comment="Número de factura (ej: 6-21-2-2026)",
     )
 
     # ---- Llaves Foráneas ----

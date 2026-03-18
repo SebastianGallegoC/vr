@@ -1,10 +1,9 @@
 "use client";
 
-/**
- * VegasDelRio - Formulario de Periodo de Facturación (Crear / Editar).
- */
-
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,6 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { DatePicker } from "@/components/ui/date-picker";
 import type {
   BillingPeriod,
   BillingPeriodCreate,
@@ -58,21 +66,6 @@ const ESTADOS = [
   { value: "cancelled", label: "Cancelado" },
 ];
 
-interface FormState {
-  mes: number;
-  anio: number;
-  descripcion: string;
-  monto_base: string;
-  fecha_vencimiento: string;
-  estado: string;
-}
-
-interface FormErrors {
-  monto_base?: string;
-  fecha_vencimiento?: string;
-  anio?: string;
-}
-
 function buildDescripcion(mes: number, anio: number): string {
   const mesLabel = MESES.find((m) => m.value === mes)?.label ?? "";
   return `Cuota ${mesLabel} ${anio}`;
@@ -92,14 +85,22 @@ function formatWithDots(raw: string): string {
 const currentYear = new Date().getFullYear();
 const currentMonth = new Date().getMonth() + 1;
 
-const EMPTY_FORM: FormState = {
-  mes: currentMonth,
-  anio: currentYear,
-  descripcion: buildDescripcion(currentMonth, currentYear),
-  monto_base: "",
-  fecha_vencimiento: "",
-  estado: "open",
-};
+const periodSchema = z.object({
+  mes: z.number().min(1).max(12),
+  anio: z
+    .number({ message: "Ingrese un año válido." })
+    .min(2020, "El año mínimo es 2020.")
+    .max(2099, "El año máximo es 2099."),
+  descripcion: z.string(),
+  monto_base: z.string().min(1, "Ingrese un monto válido mayor a 0."),
+  recargo_mora: z.string(),
+  fecha_vencimiento: z
+    .string()
+    .min(1, "La fecha de vencimiento es obligatoria."),
+  estado: z.string(),
+});
+
+type PeriodFormValues = z.infer<typeof periodSchema>;
 
 export function PeriodForm({
   open,
@@ -108,72 +109,81 @@ export function PeriodForm({
   period,
 }: PeriodFormProps) {
   const isEditing = Boolean(period);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<FormErrors>({});
+
+  const form = useForm<PeriodFormValues>({
+    resolver: zodResolver(periodSchema),
+    defaultValues: {
+      mes: currentMonth,
+      anio: currentYear,
+      descripcion: buildDescripcion(currentMonth, currentYear),
+      monto_base: "",
+      recargo_mora: "",
+      fecha_vencimiento: "",
+      estado: "open",
+    },
+  });
 
   useEffect(() => {
     if (period) {
-      setForm({
+      form.reset({
         mes: period.mes,
         anio: period.anio,
         descripcion: period.descripcion,
         monto_base: stripNonDigits(String(Math.round(period.monto_base))),
+        recargo_mora: stripNonDigits(
+          String(Math.round(period.recargo_mora ?? 0)),
+        ),
         fecha_vencimiento: period.fecha_vencimiento,
         estado: period.estado,
       });
     } else {
-      setForm(EMPTY_FORM);
+      form.reset({
+        mes: currentMonth,
+        anio: currentYear,
+        descripcion: buildDescripcion(currentMonth, currentYear),
+        monto_base: "",
+        recargo_mora: "",
+        fecha_vencimiento: "",
+        estado: "open",
+      });
     }
-    setErrors({});
-  }, [period, open]);
+  }, [period, open, form]);
 
   function updateMesAnio(mes: number, anio: number) {
-    setForm((prev) => ({
-      ...prev,
-      mes,
-      anio,
-      descripcion: buildDescripcion(mes, anio),
-    }));
+    form.setValue("mes", mes);
+    form.setValue("anio", anio);
+    form.setValue("descripcion", buildDescripcion(mes, anio));
   }
 
-  function validate(): boolean {
-    const newErrors: FormErrors = {};
-    const monto = Number(form.monto_base);
-    if (!form.monto_base || isNaN(monto) || monto <= 0) {
-      newErrors.monto_base = "Ingrese un monto válido mayor a 0.";
+  async function handleValid(data: PeriodFormValues) {
+    const monto = Number(data.monto_base);
+    if (isNaN(monto) || monto <= 0) {
+      form.setError("monto_base", {
+        message: "Ingrese un monto válido mayor a 0.",
+      });
+      return;
     }
-    if (!form.fecha_vencimiento) {
-      newErrors.fecha_vencimiento = "La fecha de vencimiento es obligatoria.";
-    }
-    if (!form.anio || form.anio < 2020 || form.anio > 2099) {
-      newErrors.anio = "Ingrese un año válido (2020-2099).";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!validate()) return;
 
     setLoading(true);
     try {
       if (isEditing) {
         const payload: BillingPeriodUpdate = {
-          descripcion: form.descripcion.trim(),
-          monto_base: Number(form.monto_base),
-          fecha_vencimiento: form.fecha_vencimiento,
-          estado: form.estado as BillingPeriodUpdate["estado"],
+          descripcion: data.descripcion.trim(),
+          monto_base: monto,
+          recargo_mora: Number(data.recargo_mora || "0"),
+          fecha_vencimiento: data.fecha_vencimiento,
+          estado: data.estado as BillingPeriodUpdate["estado"],
         };
         await onSubmit(payload);
       } else {
         const payload: BillingPeriodCreate = {
-          mes: form.mes,
-          anio: form.anio,
-          descripcion: form.descripcion.trim(),
-          monto_base: Number(form.monto_base),
-          fecha_vencimiento: form.fecha_vencimiento,
+          mes: data.mes,
+          anio: data.anio,
+          descripcion: data.descripcion.trim(),
+          monto_base: monto,
+          recargo_mora: Number(data.recargo_mora || "0"),
+          fecha_vencimiento: data.fecha_vencimiento,
         };
         await onSubmit(payload);
       }
@@ -197,151 +207,204 @@ export function PeriodForm({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          {/* Mes y Año */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>
-                Mes <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={String(form.mes)}
-                onValueChange={(val) => updateMesAnio(parseInt(val), form.anio)}
-                disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MESES.map((m) => (
-                    <SelectItem key={m.value} value={String(m.value)}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="anio">
-                Año <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="anio"
-                type="number"
-                min={2020}
-                max={2099}
-                value={form.anio}
-                onChange={(e) => {
-                  const anio = parseInt(e.target.value) || currentYear;
-                  updateMesAnio(form.mes, anio);
-                }}
-                disabled={isEditing}
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(handleValid)}
+            className="space-y-4 py-2"
+          >
+            {/* Mes y Año */}
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="mes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Mes <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <Select
+                      value={String(field.value)}
+                      onValueChange={(val) =>
+                        updateMesAnio(parseInt(val), form.getValues("anio"))
+                      }
+                      disabled={isEditing}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {MESES.map((m) => (
+                          <SelectItem key={m.value} value={String(m.value)}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.anio && (
-                <p className="text-xs text-red-500">{errors.anio}</p>
+
+              <FormField
+                control={form.control}
+                name="anio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Año <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={2020}
+                        max={2099}
+                        value={field.value}
+                        onChange={(e) => {
+                          const anio = parseInt(e.target.value) || currentYear;
+                          updateMesAnio(form.getValues("mes"), anio);
+                        }}
+                        disabled={isEditing}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Descripción (auto-generada) */}
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: Cuota Enero 2025" {...field} />
+                  </FormControl>
+                </FormItem>
               )}
-            </div>
-          </div>
-
-          {/* Descripción (auto-generada) */}
-          <div className="space-y-1">
-            <Label htmlFor="descripcion">Descripción</Label>
-            <Input
-              id="descripcion"
-              value={form.descripcion}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, descripcion: e.target.value }))
-              }
-              placeholder="Ej: Cuota Enero 2025"
             />
-          </div>
 
-          {/* Monto base */}
-          <div className="space-y-1">
-            <Label htmlFor="monto_base">
-              Monto base ($) <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="monto_base"
-              type="text"
-              inputMode="numeric"
-              value={formatWithDots(form.monto_base)}
-              onChange={(e) => {
-                const raw = stripNonDigits(e.target.value);
-                setForm((prev) => ({ ...prev, monto_base: raw }));
-                setErrors((prev) => ({ ...prev, monto_base: undefined }));
-              }}
-              placeholder="Ej: 150000.00"
+            {/* Monto base */}
+            <FormField
+              control={form.control}
+              name="monto_base"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Monto base ($) <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithDots(field.value)}
+                      onChange={(e) => {
+                        const raw = stripNonDigits(e.target.value);
+                        field.onChange(raw);
+                      }}
+                      placeholder="Ej: 150.000"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-            {errors.monto_base && (
-              <p className="text-xs text-red-500">{errors.monto_base}</p>
+
+            {/* Recargo por mora */}
+            <FormField
+              control={form.control}
+              name="recargo_mora"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Recargo por mora ($)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatWithDots(field.value)}
+                      onChange={(e) => {
+                        const raw = stripNonDigits(e.target.value);
+                        field.onChange(raw);
+                      }}
+                      placeholder="Ej: 50.000"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Se aplica cuando se supera la fecha de vencimiento.
+                  </FormDescription>
+                </FormItem>
+              )}
+            />
+
+            {/* Fecha de vencimiento */}
+            <FormField
+              control={form.control}
+              name="fecha_vencimiento"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Fecha de vencimiento{" "}
+                    <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <DatePicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Seleccionar fecha de vencimiento"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Estado (solo en edición) */}
+            {isEditing && (
+              <FormField
+                control={form.control}
+                name="estado"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {ESTADOS.map((e) => (
+                          <SelectItem key={e.value} value={e.value}>
+                            {e.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
             )}
-          </div>
 
-          {/* Fecha de vencimiento */}
-          <div className="space-y-1">
-            <Label htmlFor="fecha_vencimiento">
-              Fecha de vencimiento <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="fecha_vencimiento"
-              type="date"
-              value={form.fecha_vencimiento}
-              onChange={(e) => {
-                setForm((prev) => ({
-                  ...prev,
-                  fecha_vencimiento: e.target.value,
-                }));
-                setErrors((prev) => ({
-                  ...prev,
-                  fecha_vencimiento: undefined,
-                }));
-              }}
-            />
-            {errors.fecha_vencimiento && (
-              <p className="text-xs text-red-500">{errors.fecha_vencimiento}</p>
-            )}
-          </div>
-
-          {/* Estado (solo en edición) */}
-          {isEditing && (
-            <div className="space-y-1">
-              <Label>Estado</Label>
-              <Select
-                value={form.estado}
-                onValueChange={(val) =>
-                  setForm((prev) => ({ ...prev, estado: val }))
-                }
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={loading}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ESTADOS.map((e) => (
-                    <SelectItem key={e.value} value={e.value}>
-                      {e.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Guardar cambios" : "Crear periodo"}
-            </Button>
-          </DialogFooter>
-        </form>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditing ? "Guardar cambios" : "Crear periodo"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

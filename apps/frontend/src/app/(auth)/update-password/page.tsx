@@ -119,7 +119,7 @@ export default function UpdatePasswordPage() {
     return (
       <Card className="shadow-lg">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-blue-600">
+          <CardTitle className="text-2xl font-bold text-primary">
             Vegas del Río
           </CardTitle>
           <CardDescription>Verificando enlace de recuperación…</CardDescription>
@@ -127,7 +127,7 @@ export default function UpdatePasswordPage() {
         <CardContent className="text-center text-sm text-muted-foreground">
           <p>
             Si el enlace expiró o es inválido, puedes{" "}
-            <a href="/login" className="text-blue-600 underline">
+            <a href="/login" className="text-primary underline">
               volver al inicio de sesión
             </a>{" "}
             y solicitar uno nuevo.
@@ -156,7 +156,7 @@ export default function UpdatePasswordPage() {
   return (
     <Card className="shadow-lg">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold text-blue-600">
+        <CardTitle className="text-2xl font-bold text-primary">
           Vegas del Río
         </CardTitle>
         <CardDescription>Establece tu nueva contraseña</CardDescription>

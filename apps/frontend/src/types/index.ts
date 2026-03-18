@@ -100,6 +100,7 @@ export interface BillingPeriod {
   descripcion: string;
   monto_base: number;
   fecha_vencimiento: string;
+  recargo_mora: number;
   estado: PeriodStatus;
   creado_en: string;
   actualizado_en: string;
@@ -111,12 +112,14 @@ export interface BillingPeriodCreate {
   descripcion: string;
   monto_base: number;
   fecha_vencimiento: string;
+  recargo_mora?: number;
 }
 
 export interface BillingPeriodUpdate {
   descripcion?: string;
   monto_base?: number;
   fecha_vencimiento?: string;
+  recargo_mora?: number;
   estado?: PeriodStatus;
 }
 
@@ -231,4 +234,49 @@ export interface SendEmailsResponse {
   emails_enviados: number;
   emails_fallidos: number;
   errores: string[];
+}
+
+// ============================================================
+// Portal de Propietarios
+// ============================================================
+
+export interface PortalOwnerInfo {
+  id: string;
+  nombre_completo: string;
+  email: string;
+}
+
+export interface PortalPropertyInfo {
+  id: string;
+  numero_casa: string;
+}
+
+export interface PortalLoginResponse {
+  access_token: string;
+  token_type: string;
+  propietario: PortalOwnerInfo;
+  propiedad: PortalPropertyInfo;
+}
+
+export interface PortalProfile {
+  propietario: PortalOwnerInfo;
+  propiedad: PortalPropertyInfo;
+}
+
+export interface PortalBillItem {
+  concepto: string;
+  descripcion: string | null;
+  monto: number;
+}
+
+export interface PortalBill {
+  id: string;
+  numero_factura: string;
+  monto_total: number;
+  estado: BillStatus;
+  notas: string | null;
+  pagado_en: string | null;
+  creado_en: string;
+  periodo_descripcion: string | null;
+  items: PortalBillItem[];
 }

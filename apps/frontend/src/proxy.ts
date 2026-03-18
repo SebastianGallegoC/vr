@@ -48,9 +48,14 @@ export async function proxy(request: NextRequest) {
 
   // --- Protección de Rutas ---
 
+  // Las rutas del portal de propietarios usan auth propia (JWT HS256),
+  // no Supabase Auth — se excluyen de esta protección.
+  const isPortalRoute = request.nextUrl.pathname.startsWith("/portal");
+
   // Si NO hay usuario y trata de acceder al dashboard → login
   if (
     !user &&
+    !isPortalRoute &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     request.nextUrl.pathname !== "/"
